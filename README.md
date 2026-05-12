@@ -81,6 +81,75 @@ C#, TypeScript, JavaScript, Python, Go
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Yes (for suggestions) | Anthropic API key — `sk-ant-...` |
 
+## MCP Server — Claude Desktop & Claude Code
+
+LivingDocs exposes two MCP tools:
+
+| Tool | Description |
+|---|---|
+| `scan_repo` | Scan a repo and list stale doc files with staleness % |
+| `suggest_doc_update` | Ask Claude to rewrite a stale doc comment |
+
+### Claude Desktop
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "livingdocs": {
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "/absolute/path/to/livingdocs/src/LivingDocs.McpServer"
+      ],
+      "env": {
+        "ANTHROPIC_API_KEY": "sk-ant-..."
+      }
+    }
+  }
+}
+```
+
+Restart Claude Desktop — you will see a hammer icon confirming the tools are loaded.
+
+### Claude Code (CLI)
+
+Add to your project's `.mcp.json` (or `~/.claude/settings.json`):
+
+```json
+{
+  "mcpServers": {
+    "livingdocs": {
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "/absolute/path/to/livingdocs/src/LivingDocs.McpServer"
+      ],
+      "env": {
+        "ANTHROPIC_API_KEY": "sk-ant-..."
+      }
+    }
+  }
+}
+```
+
+Then in Claude Code chat:
+
+```
+scan this repo for stale docs    → uses scan_repo
+suggest a fix for src/Tax.cs     → uses suggest_doc_update
+```
+
+### Production binary (faster startup)
+
+```bash
+dotnet publish src/LivingDocs.McpServer -c Release -o out/
+# then set "command": "/absolute/path/to/out/livingdocs" in the config above
+```
+
 ## Sprint Board
 
 [GitHub Issues](https://github.com/dinesh-mys/livingdocs/issues)
