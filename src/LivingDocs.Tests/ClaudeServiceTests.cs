@@ -113,6 +113,33 @@ public class ClaudeServiceTests
         Assert.Equal("/// Calculates tax at 20%.", result);
     }
 
+    // ── QueryDocsAsync ────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task QueryDocsAsync_WithDocs_SendsPromptAndReturnsAnswer()
+    {
+        var sut = BuildSut(HttpStatusCode.OK, OkBody("Tax.cs handles tax at 20%."));
+
+        var docs = new[]
+        {
+            new DocChunk { FilePath = "Tax.cs", LineNumber = 5, Content = "Calculates tax at 20%.", ParentSymbol = "CalculateTax", Language = "csharp" }
+        };
+
+        var result = await sut.QueryDocsAsync("What does CalculateTax do?", docs);
+
+        Assert.Equal("Tax.cs handles tax at 20%.", result);
+    }
+
+    [Fact]
+    public async Task QueryDocsAsync_NoDocs_ReturnsAnswer()
+    {
+        var sut = BuildSut(HttpStatusCode.OK, OkBody("No docs found."));
+
+        var result = await sut.QueryDocsAsync("What does this repo do?", []);
+
+        Assert.Equal("No docs found.", result);
+    }
+
     // ── Missing API key ───────────────────────────────────────────────────
 
     [Fact]

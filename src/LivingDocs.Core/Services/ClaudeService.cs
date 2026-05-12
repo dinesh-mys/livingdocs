@@ -99,4 +99,31 @@ public class ClaudeService : IClaudeService
 
         return await CompleteAsync(prompt, maxTokens: 512);
     }
+
+    public async Task<string> QueryDocsAsync(string question, IEnumerable<DocChunk> docs)
+    {
+        var docList = docs.ToList();
+
+        var context = new System.Text.StringBuilder();
+        foreach (var doc in docList)
+        {
+            var symbol = doc.ParentSymbol is not null ? $" ({doc.ParentSymbol})" : string.Empty;
+            context.AppendLine($"[{doc.FilePath}:{doc.LineNumber}{symbol}]");
+            context.AppendLine(doc.Content);
+            context.AppendLine();
+        }
+
+        var prompt = $"""
+            You are a documentation assistant. Answer the question below using only the
+            documentation comments provided. If the answer is not in the docs, say so clearly.
+            Be concise and cite the file and symbol where relevant.
+
+            DOCUMENTATION:
+            {context}
+
+            QUESTION: {question}
+            """;
+
+        return await CompleteAsync(prompt, maxTokens: 1024);
+    }
 }

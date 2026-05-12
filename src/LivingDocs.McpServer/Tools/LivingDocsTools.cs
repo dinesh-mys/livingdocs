@@ -39,6 +39,48 @@ public static class LivingDocsTools
         return sb.ToString().TrimEnd();
     }
 
+    [McpServerTool(Name = "query_docs", ReadOnly = true)]
+    [Description(
+        "Answer a natural-language question about a codebase using its documentation comments. " +
+        "Extracts all doc comments from source files and asks Claude to answer based on them. " +
+        "Requires ANTHROPIC_API_KEY to be set.")]
+    public static async Task<string> QueryDocs(
+        IClaudeService claude,
+        IDocExtractorService extractor,
+        [Description("Absolute path to the local git repository")] string repoPath,
+        [Description("Natural-language question, e.g. 'What does the Tax class do?' or 'How is authentication handled?'")] string question)
+    {
+        if (!Directory.Exists(repoPath))
+            return $"Error: directory not found — {repoPath}";
+
+        var extensions = new HashSet<string>([".cs", ".ts", ".tsx", ".js", ".jsx", ".py"], StringComparer.OrdinalIgnoreCase);
+        var skipDirs   = new HashSet<string>(["bin", "obj", "node_modules", ".git"], StringComparer.OrdinalIgnoreCase);
+
+        var allChunks = new List<LivingDocs.Core.Models.DocChunk>();
+
+        var files = Directory.EnumerateFiles(repoPath, "*", SearchOption.AllDirectories)
+            .Where(f =>
+            {
+                var relative = f[(repoPath.Length + 1)..];
+                var parts    = relative.Split(Path.DirectorySeparatorChar);
+                return !parts.Any(p => skipDirs.Contains(p))
+                       && extensions.Contains(Path.GetExtension(f));
+            });
+
+        foreach (var file in files)
+        {
+            var relativePath = Path.GetRelativePath(repoPath, file);
+            var content      = await File.ReadAllTextAsync(file);
+            var chunks       = await extractor.ExtractAsync(relativePath, content);
+            allChunks.AddRange(chunks);
+        }
+
+        if (allChunks.Count == 0)
+            return "No documentation comments found in this repository.";
+
+        return await claude.QueryDocsAsync(question, allChunks);
+    }
+
     [McpServerTool(Name = "suggest_doc_update")]
     [Description(
         "Use Claude to suggest an updated documentation comment for a specific file, " +

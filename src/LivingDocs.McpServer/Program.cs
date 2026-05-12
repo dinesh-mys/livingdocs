@@ -98,4 +98,5 @@ file sealed class NullClaudeService : IClaudeService
     private const string Msg = "ANTHROPIC_API_KEY is not set. Add it to your .env file and restart the server.";
     public Task<string> CompleteAsync(string prompt, int maxTokens = 1024) => Task.FromResult(Msg);
     public Task<string> SuggestDocUpdateAsync(ChangeEvent change, DocChunk existingDoc) => Task.FromResult(Msg);
+    public Task<string> QueryDocsAsync(string question, IEnumerable<DocChunk> docs) => Task.FromResult(Msg);
 }
