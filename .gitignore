@@ -435,3 +435,4 @@ FodyWeavers.xsd
 # Local MCP config (may contain API keys)
 .mcp.json
 nupkg/
+*.DS_Store
