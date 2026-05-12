@@ -1,6 +1,6 @@
 # LivingDocs
 
-AI-powered documentation health monitor. Detects stale code comments, suggests updates using Claude, and works as an MCP server for Claude Desktop, Claude Code, and GitHub Copilot.
+AI-powered documentation health monitor. Detects stale code comments, answers questions about your codebase, suggests updates using Claude, and works as an MCP server for Claude Desktop, Claude Code, and GitHub Copilot.
 
 ## Install
 
@@ -15,6 +15,7 @@ dotnet tool install -g LivingDocs.Mcp
 | Tool | Tier | Description |
 |------|------|-------------|
 | `scan_repo` | Free | Scan a repo and list stale doc files with staleness % (0–100%) |
+| `query_docs` | Free | Answer natural-language questions about your codebase using its doc comments |
 | `suggest_doc_update` | Free | Ask Claude to rewrite a stale doc comment |
 | `sync_confluence` | Pro | Write updated docs back to Confluence pages |
 | `scan_org` | Pro | Scan all repos in a GitHub org and return an org-wide report |
@@ -58,7 +59,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop. The `scan_repo` and `suggest_doc_update` tools will appear under the **+** menu.
+Restart Claude Desktop. The `scan_repo`, `query_docs`, and `suggest_doc_update` tools will appear under the **+** menu.
 
 ---
 
@@ -88,8 +89,9 @@ claude mcp add livingdocs -s user -- livingdocs-mcp
 Then in Claude Code chat:
 
 ```
-scan this repo for stale docs       → uses scan_repo
-suggest a fix for src/Tax.cs        → uses suggest_doc_update
+scan this repo for stale docs              → uses scan_repo
+what does the Auth module do?              → uses query_docs
+suggest a fix for src/Tax.cs              → uses suggest_doc_update
 ```
 
 ---
@@ -112,7 +114,7 @@ VS Code 1.99+ supports MCP servers in Copilot agent mode. Add a `.vscode/mcp.jso
 }
 ```
 
-Open the Copilot chat panel, switch to **Agent mode**, and the `scan_repo` and `suggest_doc_update` tools will be available.
+Open the Copilot chat panel, switch to **Agent mode**, and the `scan_repo`, `query_docs`, and `suggest_doc_update` tools will be available.
 
 ---
 
@@ -148,7 +150,7 @@ Get a license at **[polar.sh/dinesh-mys/livingdocs](https://polar.sh/dinesh-mys/
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `ANTHROPIC_API_KEY` | Yes (for `suggest_doc_update`) | Anthropic API key |
+| `ANTHROPIC_API_KEY` | Yes (for `query_docs` and `suggest_doc_update`) | Anthropic API key |
 | `LIVINGDOCS_LICENSE_KEY` | Yes (for Pro tools) | License key from Polar.sh |
 
 ## Supported languages
