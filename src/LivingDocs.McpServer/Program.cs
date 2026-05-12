@@ -27,7 +27,9 @@ builder.Services
     {
         try   { return new ClaudeService(new HttpClient()); }
         catch  { return new NullClaudeService(); }
-    })
+    });
+
+builder.Services
     .AddMcpServer()
     .WithStdioServerTransport()
     .WithToolsFromAssembly(typeof(LivingDocsTools).Assembly);
