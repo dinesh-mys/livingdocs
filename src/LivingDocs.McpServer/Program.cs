@@ -27,7 +27,8 @@ builder.Services
     {
         try   { return new ClaudeService(new HttpClient()); }
         catch  { return new NullClaudeService(); }
-    });
+    })
+    .AddSingleton<ILicenseService>(_ => new LicenseService(new HttpClient()));
 
 builder.Services
     .AddMcpServer()
