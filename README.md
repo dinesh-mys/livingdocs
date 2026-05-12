@@ -1,52 +1,29 @@
 # LivingDocs
 
-AI-powered documentation health monitor. Detects stale code comments and docstrings, suggests updates using Claude, and writes back to Confluence/Notion.
+AI-powered documentation health monitor. Detects stale code comments, suggests updates using Claude, and works as an MCP server for Claude Desktop, Claude Code, and GitHub Copilot.
 
-## Architecture
+## Install
 
-```
-┌─────────────────────────────────────────┐
-│              Interfaces                  │
-│   Claude Code (MCP)  │  GitHub Copilot  │
-└──────────┬───────────┴────────┬─────────┘
-           │                    │
-    LivingDocs.McpServer  LivingDocs.CopilotExt
-           │                    │
-           └────────┬───────────┘
-                    │
-           LivingDocs.Core
-       ┌────────────┼────────────┐
-  GitScanner  DocExtractor  ClaudeService
-                    │
-            StaleDocDetector
-```
-
-## Prerequisites
-
-- [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- Git (must be on `PATH`)
-- An [Anthropic API key](https://console.anthropic.com/) for Claude suggestions
-
-## Quickstart
+Requires [.NET 10 SDK](https://dotnet.microsoft.com/download).
 
 ```bash
-# 1. Clone
-git clone https://github.com/dinesh-mys/livingdocs
-cd livingdocs
-
-# 2. Set API key
-cp .env.example .env
-# Edit .env and set ANTHROPIC_API_KEY=sk-ant-...
-
-# 3. Build & test
-make build
-make test
-
-# 4. Scan a repo
-make scan REPO=/path/to/your/repo
+dotnet tool install -g LivingDocs.Mcp
 ```
 
-## Scan output
+## Tools
+
+| Tool | Tier | Description |
+|------|------|-------------|
+| `scan_repo` | Free | Scan a repo and list stale doc files with staleness % (0–100%) |
+| `suggest_doc_update` | Free | Ask Claude to rewrite a stale doc comment |
+| `sync_confluence` | Pro | Write updated docs back to Confluence pages |
+| `scan_org` | Pro | Scan all repos in a GitHub org and return an org-wide report |
+
+## Quick test
+
+```bash
+livingdocs-mcp scan /path/to/your/repo
+```
 
 ```
 Scanning /path/to/repo ...
@@ -62,35 +39,9 @@ Stale docs     : 2
                code changed: 2025-01-28
 ```
 
-## Projects
+---
 
-| Project | Purpose |
-|---|---|
-| `LivingDocs.Core` | Shared engine — git scanning, doc extraction, stale detection, Claude API |
-| `LivingDocs.McpServer` | CLI + MCP server (Claude Desktop / Claude Code) |
-| `LivingDocs.CopilotExt` | GitHub Copilot Extension webhook API |
-| `LivingDocs.Tests` | xUnit test suite (36 tests) |
-
-## Supported languages
-
-C#, TypeScript, JavaScript, Python, Go
-
-## Environment variables
-
-| Variable | Required | Description |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | Yes (for suggestions) | Anthropic API key — `sk-ant-...` |
-
-## MCP Server — Claude Desktop & Claude Code
-
-LivingDocs exposes two MCP tools:
-
-| Tool | Description |
-|---|---|
-| `scan_repo` | Scan a repo and list stale doc files with staleness % |
-| `suggest_doc_update` | Ask Claude to rewrite a stale doc comment |
-
-### Claude Desktop
+## Setup — Claude Desktop
 
 Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
@@ -98,12 +49,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "livingdocs": {
-      "command": "dotnet",
-      "args": [
-        "run",
-        "--project",
-        "/absolute/path/to/livingdocs/src/LivingDocs.McpServer"
-      ],
+      "command": "livingdocs-mcp",
       "env": {
         "ANTHROPIC_API_KEY": "sk-ant-..."
       }
@@ -112,22 +58,19 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop — you will see a hammer icon confirming the tools are loaded.
+Restart Claude Desktop. The `scan_repo` and `suggest_doc_update` tools will appear under the **+** menu.
 
-### Claude Code (CLI)
+---
 
-Add to your project's `.mcp.json` (or `~/.claude/settings.json`):
+## Setup — Claude Code
+
+Add a `.mcp.json` file to your project root:
 
 ```json
 {
   "mcpServers": {
     "livingdocs": {
-      "command": "dotnet",
-      "args": [
-        "run",
-        "--project",
-        "/absolute/path/to/livingdocs/src/LivingDocs.McpServer"
-      ],
+      "command": "livingdocs-mcp",
       "env": {
         "ANTHROPIC_API_KEY": "sk-ant-..."
       }
@@ -136,20 +79,117 @@ Add to your project's `.mcp.json` (or `~/.claude/settings.json`):
 }
 ```
 
+Or register globally:
+
+```bash
+claude mcp add livingdocs -s user -- livingdocs-mcp
+```
+
 Then in Claude Code chat:
 
 ```
-scan this repo for stale docs    → uses scan_repo
-suggest a fix for src/Tax.cs     → uses suggest_doc_update
+scan this repo for stale docs       → uses scan_repo
+suggest a fix for src/Tax.cs        → uses suggest_doc_update
 ```
 
-### Production binary (faster startup)
+---
+
+## Setup — GitHub Copilot (VS Code)
+
+VS Code 1.99+ supports MCP servers in Copilot agent mode. Add a `.vscode/mcp.json` file to your project:
+
+```json
+{
+  "servers": {
+    "livingdocs": {
+      "type": "stdio",
+      "command": "livingdocs-mcp",
+      "env": {
+        "ANTHROPIC_API_KEY": "sk-ant-..."
+      }
+    }
+  }
+}
+```
+
+Open the Copilot chat panel, switch to **Agent mode**, and the `scan_repo` and `suggest_doc_update` tools will be available.
+
+---
+
+## Pro tier
+
+Pro tools require a license key set as an environment variable:
 
 ```bash
-dotnet publish src/LivingDocs.McpServer -c Release -o out/
-# then set "command": "/absolute/path/to/out/livingdocs" in the config above
+export LIVINGDOCS_LICENSE_KEY=LD-xxxx-xxxx-xxxx
 ```
 
-## Sprint Board
+Or add it to the `env` block in your config:
 
-[GitHub Issues](https://github.com/dinesh-mys/livingdocs/issues)
+```json
+{
+  "mcpServers": {
+    "livingdocs": {
+      "command": "livingdocs-mcp",
+      "env": {
+        "ANTHROPIC_API_KEY": "sk-ant-...",
+        "LIVINGDOCS_LICENSE_KEY": "LD-xxxx-xxxx-xxxx"
+      }
+    }
+  }
+}
+```
+
+Get a license at **[polar.sh/dinesh-mys/livingdocs](https://polar.sh/dinesh-mys/livingdocs)**.
+
+---
+
+## Environment variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ANTHROPIC_API_KEY` | Yes (for `suggest_doc_update`) | Anthropic API key |
+| `LIVINGDOCS_LICENSE_KEY` | Yes (for Pro tools) | License key from Polar.sh |
+
+## Supported languages
+
+C#, TypeScript, JavaScript, Python, Go
+
+## Build from source
+
+```bash
+git clone https://github.com/dinesh-mys/livingdocs
+cd livingdocs
+make build
+make test
+make scan REPO=/path/to/your/repo
+```
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│                  Interfaces                  │
+│  Claude Desktop │ Claude Code │ VS Copilot  │
+└───────┬─────────────────────────────┬────────┘
+        │                             │
+   livingdocs-mcp              (coming soon)
+   (MCP server)              LivingDocs.CopilotExt
+        │
+   LivingDocs.Core
+   ┌────┴────────────────┐
+GitScanner  DocExtractor  StaleDocDetector  ClaudeService
+```
+
+## Projects
+
+| Project | Purpose |
+|---------|---------|
+| `LivingDocs.Core` | Shared engine — git scanning, doc extraction, stale detection, Claude API |
+| `LivingDocs.McpServer` | CLI + MCP server — published as `LivingDocs.Mcp` on NuGet |
+| `LivingDocs.CopilotExt` | GitHub Copilot Extension webhook (coming soon) |
+| `LivingDocs.Tests` | xUnit test suite |
+
+## License
+
+MIT — see [LICENSE](LICENSE).

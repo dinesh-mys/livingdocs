@@ -1,0 +1,11 @@
+{
+  "servers": {
+    "livingdocs": {
+      "type": "stdio",
+      "command": "livingdocs-mcp",
+      "env": {
+        "ANTHROPIC_API_KEY": "${env:ANTHROPIC_API_KEY}"
+      }
+    }
+  }
+}
