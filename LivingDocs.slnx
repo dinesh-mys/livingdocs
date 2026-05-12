@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LivingDocs.CopilotExt/LivingDocs.CopilotExt.csproj" />
+    <Project Path="src/LivingDocs.Core/LivingDocs.Core.csproj" />
+    <Project Path="src/LivingDocs.McpServer/LivingDocs.McpServer.csproj" />
+    <Project Path="src/LivingDocs.Tests/LivingDocs.Tests.csproj" />
+  </Folder>
+</Solution>

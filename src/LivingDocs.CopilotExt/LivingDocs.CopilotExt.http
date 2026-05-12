@@ -1,0 +1,6 @@
+@LivingDocs.CopilotExt_HostAddress = http://localhost:5075
+
+GET {{LivingDocs.CopilotExt_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
