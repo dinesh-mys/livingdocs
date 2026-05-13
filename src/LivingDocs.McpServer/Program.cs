@@ -7,10 +7,28 @@ using Microsoft.Extensions.Logging;
 
 LoadDotEnv();
 
-// CLI mode: livingdocs scan <path>
+// CLI mode
 if (args is ["scan", var repoPath])
 {
     await RunScanAsync(repoPath);
+    return;
+}
+
+if (args is ["index", var indexRepo])
+{
+    await RunIndexAsync(indexRepo);
+    return;
+}
+
+if (args is ["reindex", var reindexRepo, var changedFile])
+{
+    await RunReindexAsync(reindexRepo, changedFile);
+    return;
+}
+
+if (args is ["install-hooks", var hooksRepo])
+{
+    await RunInstallHooksAsync(hooksRepo);
     return;
 }
 
@@ -28,7 +46,9 @@ builder.Services
         try   { return new ClaudeService(new HttpClient()); }
         catch  { return new NullClaudeService(); }
     })
-    .AddSingleton<ILicenseService>(_ => new LicenseService(new HttpClient()));
+    .AddSingleton<ILicenseService>(_ => new LicenseService(new HttpClient()))
+    .AddSingleton<ISemanticSearchServiceFactory, ClaudeAssistedSearchFactory>()
+    .AddSingleton<IIndexService, IndexService>();
 
 builder.Services
     .AddMcpServer()
@@ -73,6 +93,78 @@ static async Task RunScanAsync(string repoPath)
     }
 }
 
+static async Task RunIndexAsync(string repoPath)
+{
+    if (!Directory.Exists(repoPath))
+    {
+        Console.Error.WriteLine($"Directory not found: {repoPath}");
+        Environment.Exit(1);
+    }
+
+    Console.WriteLine($"Indexing {repoPath} ...");
+    var claude   = new ClaudeService(new HttpClient());
+    var factory  = new ClaudeAssistedSearchFactory(claude);
+    var indexer  = new IndexService(new DocExtractorService(), factory);
+    var total    = await indexer.IndexRepoAsync(repoPath);
+    Console.WriteLine($"Indexed {total} chunk(s). Semantic search ready.");
+}
+
+static async Task RunReindexAsync(string repoPath, string filePath)
+{
+    if (!Directory.Exists(repoPath)) return;
+
+    var claude  = new ClaudeService(new HttpClient());
+    var factory = new ClaudeAssistedSearchFactory(claude);
+    var indexer = new IndexService(new DocExtractorService(), factory);
+    await indexer.ReIndexFileAsync(repoPath, filePath);
+    Console.WriteLine($"Re-indexed: {filePath}");
+}
+
+static async Task RunInstallHooksAsync(string repoPath)
+{
+    if (!Directory.Exists(repoPath))
+    {
+        Console.Error.WriteLine($"Directory not found: {repoPath}");
+        Environment.Exit(1);
+    }
+
+    var gitDir = Path.Combine(repoPath, ".git");
+    if (!Directory.Exists(gitDir))
+    {
+        Console.Error.WriteLine($"Not a git repository: {repoPath}");
+        Environment.Exit(1);
+    }
+
+    var hooksDir = Path.Combine(gitDir, "hooks");
+    Directory.CreateDirectory(hooksDir);
+
+    var hookPath = Path.Combine(hooksDir, "post-commit");
+    var script   = """
+        #!/bin/sh
+        # LivingDocs — re-index changed documentation on every commit.
+        REPO_ROOT=$(git rev-parse --show-toplevel)
+        git diff --name-only HEAD~1 HEAD 2>/dev/null | while IFS= read -r file; do
+          case "$file" in
+            *.cs|*.ts|*.tsx|*.js|*.jsx|*.py)
+              livingdocs-mcp reindex "$REPO_ROOT" "$file" 2>/dev/null
+              ;;
+          esac
+        done
+        """;
+
+    await File.WriteAllTextAsync(hookPath, script);
+
+    // chmod +x on Unix
+    if (!OperatingSystem.IsWindows())
+    {
+        var chmod = System.Diagnostics.Process.Start("chmod", $"+x {hookPath}");
+        await chmod!.WaitForExitAsync();
+    }
+
+    Console.WriteLine($"Installed post-commit hook at {hookPath}");
+    Console.WriteLine("The index will update automatically on every commit.");
+}
+
 static void LoadDotEnv()
 {
     var path = Path.Combine(Directory.GetCurrentDirectory(), ".env");
@@ -96,7 +188,7 @@ static void LoadDotEnv()
 file sealed class NullClaudeService : IClaudeService
 {
     private const string Msg = "ANTHROPIC_API_KEY is not set. Add it to your .env file and restart the server.";
-    public Task<string> CompleteAsync(string prompt, int maxTokens = 1024) => Task.FromResult(Msg);
+    public Task<string> CompleteAsync(string prompt, int maxTokens = 1024, string? model = null) => Task.FromResult(Msg);
     public Task<string> SuggestDocUpdateAsync(ChangeEvent change, DocChunk existingDoc) => Task.FromResult(Msg);
     public Task<string> QueryDocsAsync(string question, IEnumerable<DocChunk> docs) => Task.FromResult(Msg);
 }

@@ -1,0 +1,15 @@
+#!/bin/sh
+# LivingDocs — re-index changed documentation on every commit.
+#
+# Install: livingdocs-mcp install-hooks /path/to/repo
+# Or manually: cp hooks/post-commit .git/hooks/post-commit && chmod +x .git/hooks/post-commit
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+git diff --name-only HEAD~1 HEAD 2>/dev/null | while IFS= read -r file; do
+  case "$file" in
+    *.cs|*.ts|*.tsx|*.js|*.jsx|*.py)
+      livingdocs-mcp reindex "$REPO_ROOT" "$file" 2>/dev/null
+      ;;
+  esac
+done

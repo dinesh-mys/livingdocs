@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text;
 using LivingDocs.Core.Interfaces;
 using ModelContextProtocol.Server;
+using LivingDocs.Core.Models;
 
 [McpServerToolType]
 public static class LivingDocsTools
@@ -41,44 +42,61 @@ public static class LivingDocsTools
 
     [McpServerTool(Name = "query_docs", ReadOnly = true)]
     [Description(
-        "Answer a natural-language question about a codebase using its documentation comments. " +
-        "Extracts all doc comments from source files and asks Claude to answer based on them. " +
+        "Answer a natural-language question about a codebase using semantic search over its " +
+        "documentation comments. Run index_repo first if you haven't indexed this repository yet. " +
         "Requires ANTHROPIC_API_KEY to be set.")]
     public static async Task<string> QueryDocs(
         IClaudeService claude,
-        IDocExtractorService extractor,
+        ISemanticSearchServiceFactory searchFactory,
         [Description("Absolute path to the local git repository")] string repoPath,
         [Description("Natural-language question, e.g. 'What does the Tax class do?' or 'How is authentication handled?'")] string question)
     {
         if (!Directory.Exists(repoPath))
             return $"Error: directory not found — {repoPath}";
 
-        var extensions = new HashSet<string>([".cs", ".ts", ".tsx", ".js", ".jsx", ".py"], StringComparer.OrdinalIgnoreCase);
-        var skipDirs   = new HashSet<string>(["bin", "obj", "node_modules", ".git"], StringComparer.OrdinalIgnoreCase);
+        await using var search = searchFactory.Create(repoPath);
 
-        var allChunks = new List<LivingDocs.Core.Models.DocChunk>();
+        var stats = search.GetStats();
+        if (stats.TotalChunks == 0)
+            return $"No search index found for '{repoPath}'.\n\n" +
+                   $"Run `index_repo` first to build the semantic index:\n\n" +
+                   $"```\nindex_repo on {repoPath}\n```";
 
-        var files = Directory.EnumerateFiles(repoPath, "*", SearchOption.AllDirectories)
-            .Where(f =>
-            {
-                var relative = f[(repoPath.Length + 1)..];
-                var parts    = relative.Split(Path.DirectorySeparatorChar);
-                return !parts.Any(p => skipDirs.Contains(p))
-                       && extensions.Contains(Path.GetExtension(f));
-            });
+        var results = await search.SearchAsync(question, topK: 10);
+        if (results.Count == 0)
+            return "No relevant documentation found for that question.";
 
-        foreach (var file in files)
-        {
-            var relativePath = Path.GetRelativePath(repoPath, file);
-            var content      = await File.ReadAllTextAsync(file);
-            var chunks       = await extractor.ExtractAsync(relativePath, content);
-            allChunks.AddRange(chunks);
-        }
+        return await claude.QueryDocsAsync(question, results.Select(r => r.Chunk));
+    }
 
-        if (allChunks.Count == 0)
-            return "No documentation comments found in this repository.";
+    [McpServerTool(Name = "index_repo")]
+    [Description(
+        "Build or refresh the semantic search index for a repository. " +
+        "Run this once before using query_docs, then again after significant code changes. " +
+        "The index is stored in a .livingdocs/ folder inside the repository. " +
+        "Requires ANTHROPIC_API_KEY to be set.")]
+    public static async Task<string> IndexRepo(
+        IIndexService indexer,
+        ISemanticSearchServiceFactory searchFactory,
+        [Description("Absolute path to the local git repository")] string repoPath)
+    {
+        if (!Directory.Exists(repoPath))
+            return $"Error: directory not found — {repoPath}";
 
-        return await claude.QueryDocsAsync(question, allChunks);
+        var total = await indexer.IndexRepoAsync(repoPath);
+
+        if (total == 0)
+            return $"No documentation comments found in '{repoPath}'. " +
+                   $"Add doc comments (///, JSDoc, or docstrings) and re-run index_repo.";
+
+        await using var search = searchFactory.Create(repoPath);
+        var stats = search.GetStats();
+        var since = stats.LastIndexed.HasValue
+            ? $" (last indexed {stats.LastIndexed.Value:yyyy-MM-dd HH:mm} UTC)"
+            : string.Empty;
+
+        return $"Indexed {total} documentation chunk(s) in '{repoPath}'{since}.\n\n" +
+               $"Semantic search is ready — use `query_docs` to ask questions about this codebase.";
     }
 
     [McpServerTool(Name = "suggest_doc_update")]

@@ -1,24 +1,33 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using LivingDocs.Core.Interfaces;
 
 public static class CopilotChatEndpoint
 {
-    public static async Task HandleAsync(HttpContext ctx, GitHubDiffService github)
+    public static async Task HandleAsync(
+        HttpContext ctx,
+        GitHubDiffService github,
+        ISemanticSearchServiceFactory searchFactory,
+        IClaudeService claude)
     {
-        var token = ctx.Request.Headers["X-GitHub-Token"].ToString();
-        var body   = await new StreamReader(ctx.Request.Body).ReadToEndAsync();
-
+        var token       = ctx.Request.Headers["X-GitHub-Token"].ToString();
+        var body        = await new StreamReader(ctx.Request.Body).ReadToEndAsync();
         var userMessage = ExtractLastUserMessage(body);
 
-        ctx.Response.ContentType = "text/event-stream";
-        ctx.Response.Headers["Cache-Control"] = "no-cache";
-        ctx.Response.Headers["X-Accel-Buffering"] = "no";
+        ctx.Response.ContentType                   = "text/event-stream";
+        ctx.Response.Headers["Cache-Control"]      = "no-cache";
+        ctx.Response.Headers["X-Accel-Buffering"]  = "no";
 
-        await RouteAsync(ctx.Response.Body, userMessage, token, github);
+        await RouteAsync(ctx.Response.Body, userMessage, token, github, searchFactory, claude);
     }
 
+    // ── Router ────────────────────────────────────────────────────────────
+
     private static async Task RouteAsync(
-        Stream output, string message, string token, GitHubDiffService github)
+        Stream output, string message, string token,
+        GitHubDiffService github,
+        ISemanticSearchServiceFactory searchFactory,
+        IClaudeService claude)
     {
         var lower = message.ToLowerInvariant();
 
@@ -37,12 +46,11 @@ public static class CopilotChatEndpoint
             return;
         }
 
-        await SseWriter.WriteTextAsync(output,
-            "**LivingDocs** can help with:\n\n" +
-            "- `what changed in src/Tax.cs in owner/repo?` — summarize recent changes to a file\n" +
-            "- `are there any stale docs?` — detect outdated documentation\n\n" +
-            "Example: `@livingdocs what changed in src/Auth.cs in dinesh-mys/livingdocs?`");
+        // Any other question — try semantic search over the local repo index.
+        await HandleQueryAsync(output, message, searchFactory, claude);
     }
+
+    // ── What changed ─────────────────────────────────────────────────────
 
     private static async Task HandleWhatChangedAsync(
         Stream output, string message, string token, GitHubDiffService github)
@@ -70,16 +78,63 @@ public static class CopilotChatEndpoint
             await github.GetRecentChangesAsync(repo, file, token));
     }
 
+    // ── Semantic query ────────────────────────────────────────────────────
+
+    private static async Task HandleQueryAsync(
+        Stream output, string question,
+        ISemanticSearchServiceFactory searchFactory,
+        IClaudeService claude)
+    {
+        var repoPath = Environment.GetEnvironmentVariable("LIVINGDOCS_REPO_PATH");
+
+        if (string.IsNullOrWhiteSpace(repoPath) || !Directory.Exists(repoPath))
+        {
+            await SseWriter.WriteTextAsync(output,
+                "**LivingDocs** can help with:\n\n" +
+                "- `what changed in src/Tax.cs in owner/repo?` — summarize recent file changes\n" +
+                "- `are there any stale docs?` — detect outdated documentation\n" +
+                "- Natural-language questions about your codebase\n\n" +
+                "To enable doc Q&A, set `LIVINGDOCS_REPO_PATH` to your local repository path " +
+                "and run `index_repo` to build the search index.");
+            return;
+        }
+
+        await using var search = searchFactory.Create(repoPath);
+        var stats = search.GetStats();
+
+        if (stats.TotalChunks == 0)
+        {
+            await SseWriter.WriteTextAsync(output,
+                $"No search index found for `{repoPath}`.\n\n" +
+                "Run `index_repo` via the MCP tool or CLI to build it:\n\n" +
+                $"```\nlivingdocs-mcp index {repoPath}\n```");
+            return;
+        }
+
+        var results = await search.SearchAsync(question, topK: 10);
+
+        if (results.Count == 0)
+        {
+            await SseWriter.WriteTextAsync(output,
+                "No relevant documentation found for that question. " +
+                "Try rephrasing, or run `index_repo` to refresh the index.");
+            return;
+        }
+
+        var answer = await claude.QueryDocsAsync(question, results.Select(r => r.Chunk));
+        await SseWriter.WriteTextAsync(output, answer);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────
+
     private static (string? file, string? repo) ExtractFileAndRepo(string message)
     {
-        // "what changed in src/Tax.cs in owner/repo"
         var full = Regex.Match(message,
             @"changed in\s+([\w./\\-]+\.\w+)\s+in\s+([\w-]+/[\w.-]+)",
             RegexOptions.IgnoreCase);
         if (full.Success)
             return (full.Groups[1].Value, full.Groups[2].Value);
 
-        // "what changed in src/Tax.cs" (no repo)
         var fileOnly = Regex.Match(message,
             @"changed in\s+([\w./\\-]+\.\w+)",
             RegexOptions.IgnoreCase);

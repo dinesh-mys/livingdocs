@@ -10,7 +10,7 @@ public class ClaudeService : IClaudeService
 {
     private readonly HttpClient _httpClient;
     private const string ApiUrl   = "https://api.anthropic.com/v1/messages";
-    private const string Model    = "claude-sonnet-4-6";
+    private const string DefaultModel = "claude-sonnet-4-6";
     private const int    MaxRetries = 3;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -34,10 +34,10 @@ public class ClaudeService : IClaudeService
         }
     }
 
-    public async Task<string> CompleteAsync(string prompt, int maxTokens = 1024)
+    public async Task<string> CompleteAsync(string prompt, int maxTokens = 1024, string? model = null)
     {
         var request = new ClaudeRequest(
-            Model:     Model,
+            Model:     model ?? DefaultModel,
             MaxTokens: maxTokens,
             Messages:  [new ClaudeMessage("user", prompt)]
         );
