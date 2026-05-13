@@ -102,7 +102,7 @@ static async Task RunIndexAsync(string repoPath)
     }
 
     Console.WriteLine($"Indexing {repoPath} ...");
-    var claude   = new ClaudeService(new HttpClient());
+    var claude   = TryCreateClaude();
     var factory  = new ClaudeAssistedSearchFactory(claude);
     var indexer  = new IndexService(new DocExtractorService(), factory);
     var total    = await indexer.IndexRepoAsync(repoPath);
@@ -113,11 +113,18 @@ static async Task RunReindexAsync(string repoPath, string filePath)
 {
     if (!Directory.Exists(repoPath)) return;
 
-    var claude  = new ClaudeService(new HttpClient());
+    var claude  = TryCreateClaude();
     var factory = new ClaudeAssistedSearchFactory(claude);
     var indexer = new IndexService(new DocExtractorService(), factory);
     await indexer.ReIndexFileAsync(repoPath, filePath);
     Console.WriteLine($"Re-indexed: {filePath}");
+}
+
+// Claude is only needed at search/rerank time, not during index builds.
+static IClaudeService TryCreateClaude()
+{
+    try   { return new ClaudeService(new HttpClient()); }
+    catch  { return new NullClaudeService(); }
 }
 
 static async Task RunInstallHooksAsync(string repoPath)
