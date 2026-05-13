@@ -54,19 +54,26 @@ public static class LivingDocsTools
         if (!Directory.Exists(repoPath))
             return $"Error: directory not found — {repoPath}";
 
-        await using var search = searchFactory.Create(repoPath);
+        try
+        {
+            await using var search = searchFactory.Create(repoPath);
 
-        var stats = search.GetStats();
-        if (stats.TotalChunks == 0)
-            return $"No search index found for '{repoPath}'.\n\n" +
-                   $"Run `index_repo` first to build the semantic index:\n\n" +
-                   $"```\nindex_repo on {repoPath}\n```";
+            var stats = search.GetStats();
+            if (stats.TotalChunks == 0)
+                return $"No search index found for '{repoPath}'.\n\n" +
+                       $"Run `index_repo` first to build the semantic index:\n\n" +
+                       $"```\nindex_repo on {repoPath}\n```";
 
-        var results = await search.SearchAsync(question, topK: 10);
-        if (results.Count == 0)
-            return "No relevant documentation found for that question.";
+            var results = await search.SearchAsync(question, topK: 10);
+            if (results.Count == 0)
+                return "No relevant documentation found for that question.";
 
-        return await claude.QueryDocsAsync(question, results.Select(r => r.Chunk));
+            return await claude.QueryDocsAsync(question, results.Select(r => r.Chunk));
+        }
+        catch (Exception ex)
+        {
+            return $"Error: {ex.GetType().Name} — {ex.Message}";
+        }
     }
 
     [McpServerTool(Name = "index_repo")]

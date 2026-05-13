@@ -3,6 +3,7 @@ using LivingDocs.Core.Models;
 
 namespace LivingDocs.Core.Services;
 
+/// <summary>Detects stale documentation by comparing when each doc comment was last committed (via git blame) against when the surrounding code last changed. Staleness is scored 0–1: 0 means fresh (code changed within 7 days of the doc), 1 means severely stale (90+ days gap).</summary>
 public class StaleDocDetectorService : IStaleDocDetectorService
 {
     private readonly IGitScannerService _scanner;
@@ -63,8 +64,7 @@ public class StaleDocDetectorService : IStaleDocDetectorService
         };
     }
 
-    // Score is 0 if code changed within 7 days of doc update;
-    // scales linearly to 1.0 at 90+ days.
+    /// <summary>Computes a staleness score between 0 and 1. Returns 0 if code changed within 7 days of the doc update (considered fresh). Returns 1 if the gap is 90 or more days. Scales linearly between those bounds.</summary>
     internal static float ComputeStaleScore(DateTime codeChanged, DateTime docUpdated)
     {
         var days = (codeChanged - docUpdated).TotalDays;

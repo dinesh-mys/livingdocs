@@ -2,6 +2,7 @@ using LivingDocs.Core.Interfaces;
 
 namespace LivingDocs.Core.Services;
 
+/// <summary>Builds and maintains the semantic search index for a repository. Walks all supported source files (.cs, .ts, .js, .py, .tsx, .jsx), extracts doc chunks via DocExtractorService, and upserts them into ISemanticSearchService. Skips bin/, obj/, node_modules/, and .git/ directories.</summary>
 public sealed class IndexService : IIndexService
 {
     private static readonly HashSet<string> Extensions = new(StringComparer.OrdinalIgnoreCase)
@@ -19,6 +20,7 @@ public sealed class IndexService : IIndexService
         _searchFactory = searchFactory;
     }
 
+    /// <summary>Full index build: scans every supported source file in the repo, deletes stale chunks for each file, indexes fresh chunks, and flushes to disk. Returns the total number of chunks indexed.</summary>
     public async Task<int> IndexRepoAsync(string repoPath)
     {
         await using var search = _searchFactory.Create(repoPath);
@@ -44,6 +46,7 @@ public sealed class IndexService : IIndexService
         return total;
     }
 
+    /// <summary>Incremental re-index for a single file. Deletes all existing chunks for that file path, re-extracts from disk, and flushes. If the file has been deleted, the delete-and-flush is sufficient. Called by the post-commit git hook.</summary>
     public async Task ReIndexFileAsync(string repoPath, string filePath)
     {
         await using var search = _searchFactory.Create(repoPath);

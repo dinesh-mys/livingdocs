@@ -32,6 +32,12 @@ if (args is ["install-hooks", var hooksRepo])
     return;
 }
 
+if (args is ["query", var queryRepo, .. var questionParts])
+{
+    await RunQueryAsync(queryRepo, string.Join(" ", questionParts));
+    return;
+}
+
 // MCP server mode — stdio transport (Claude Desktop / Claude Code)
 // Logging is suppressed so host output never corrupts the stdio JSON-RPC stream.
 var builder = Host.CreateApplicationBuilder(args);
@@ -118,6 +124,22 @@ static async Task RunReindexAsync(string repoPath, string filePath)
     var indexer = new IndexService(new DocExtractorService(), factory);
     await indexer.ReIndexFileAsync(repoPath, filePath);
     Console.WriteLine($"Re-indexed: {filePath}");
+}
+
+static async Task RunQueryAsync(string repoPath, string question)
+{
+    if (string.IsNullOrWhiteSpace(question)) { Console.Error.WriteLine("Usage: query <repo> <question>"); return; }
+    Console.WriteLine($"Querying: {question}");
+    var claude  = TryCreateClaude();
+    var factory = new ClaudeAssistedSearchFactory(claude);
+    await using var search = factory.Create(repoPath);
+    var stats = search.GetStats();
+    Console.WriteLine($"Index: {stats.TotalChunks} chunks (provider: {stats.Provider})");
+    var results = await search.SearchAsync(question, topK: 10);
+    Console.WriteLine($"BM25 results: {results.Count}");
+    if (results.Count == 0) { Console.WriteLine("No relevant docs found."); return; }
+    var answer = await claude.QueryDocsAsync(question, results.Select(r => r.Chunk));
+    Console.WriteLine(answer);
 }
 
 // Claude is only needed at search/rerank time, not during index builds.

@@ -437,3 +437,6 @@ FodyWeavers.xsd
 .mcp.json
 nupkg/
 *.DS_Store
+
+# LivingDocs generated search index (repo-local, not shared)
+.livingdocs/

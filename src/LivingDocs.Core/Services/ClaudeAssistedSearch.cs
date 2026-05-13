@@ -7,6 +7,7 @@ using LivingDocs.Core.Search;
 
 namespace LivingDocs.Core.Services;
 
+/// <summary>Vendor-neutral semantic search using BM25 pre-filtering and Claude Haiku reranking. Requires only ANTHROPIC_API_KEY — no vector database or embedding service needed. Persists the chunk index to .livingdocs/chunks.json inside the repository so it survives restarts. At query time, BM25 selects up to 40 candidates; if more than topK are found Claude Haiku reranks them and returns the top K most relevant chunks.</summary>
 public sealed class ClaudeAssistedSearch : ISemanticSearchService
 {
     // Haiku for reranking — fast and cheap, ~40 chunks per call.
@@ -107,6 +108,7 @@ public sealed class ClaudeAssistedSearch : ISemanticSearchService
 
     // ── Reranker ─────────────────────────────────────────────────────────
 
+    /// <summary>Sends up to 40 BM25 candidate chunks to Claude Haiku with a structured prompt and parses the returned JSON index array to produce a ranked result list. Falls back to BM25 order if Claude returns an unparseable response.</summary>
     private async Task<IReadOnlyList<SearchResult>> RerankAsync(
         string query, IReadOnlyList<DocChunk> candidates, int topK)
     {

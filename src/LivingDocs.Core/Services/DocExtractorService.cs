@@ -4,6 +4,7 @@ using LivingDocs.Core.Models;
 
 namespace LivingDocs.Core.Services;
 
+/// <summary>Extracts documentation comment blocks from source files. Supports C# XML doc comments (///), JSDoc blocks (/** */), and Python docstrings (\"\"\" \"\"\"). Returns one DocChunk per comment block, linked to the symbol it documents.</summary>
 public class DocExtractorService : IDocExtractorService
 {
     public Task<IEnumerable<DocChunk>> ExtractAsync(string filePath, string content)

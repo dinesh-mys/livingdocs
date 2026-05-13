@@ -6,6 +6,7 @@ using LivingDocs.Core.Models;
 
 namespace LivingDocs.Core.Services;
 
+/// <summary>Calls the Anthropic Messages API. Retries up to 3 times with exponential backoff on rate-limit and server errors.</summary>
 public class ClaudeService : IClaudeService
 {
     private readonly HttpClient _httpClient;

@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 
+/// <summary>Fetches recent commit history and unified diffs for a specific file in a GitHub repository using the GitHub REST API. Requires a valid GitHub user token passed via X-GitHub-Token.</summary>
 public class GitHubDiffService(HttpClient http)
 {
     public async Task<string> GetRecentChangesAsync(string repo, string filePath, string token)

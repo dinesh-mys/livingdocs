@@ -4,6 +4,7 @@ using LivingDocs.Core.Models;
 
 namespace LivingDocs.Core.Services;
 
+/// <summary>Reads the git log of a local repository and returns a ChangeEvent for every file touched in the last 20 commits (or since a given commit SHA).</summary>
 public class GitScannerService : IGitScannerService
 {
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -11,6 +12,7 @@ public class GitScannerService : IGitScannerService
         ".cs", ".ts", ".tsx", ".js", ".jsx", ".py", ".go"
     };
 
+    /// <summary>Returns one ChangeEvent per (commit, file) pair for the last 20 commits, or all commits since sinceCommit. Each event includes the unified diff, author, timestamp, and change type (Added/Modified/Deleted). Only files with supported extensions are included.</summary>
     public async Task<IEnumerable<ChangeEvent>> ScanAsync(string repoPath, string? sinceCommit = null)
     {
         if (!IsGitRepo(repoPath))

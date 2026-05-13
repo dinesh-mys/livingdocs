@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using LivingDocs.Core.Interfaces;
 
+/// <summary>GitHub Copilot Extension chat endpoint. Routes incoming messages to three handlers: "what changed" queries fetch a GitHub file diff via GitHubDiffService; "stale/scan" queries redirect the user to the scan_repo MCP tool; all other queries run semantic search over the local repo index (LIVINGDOCS_REPO_PATH) and answer via Claude.</summary>
 public static class CopilotChatEndpoint
 {
     public static async Task HandleAsync(
