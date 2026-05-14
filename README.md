@@ -152,12 +152,74 @@ Get a license at **[polar.sh/dinesh-mys/livingdocs](https://polar.sh/dinesh-mys/
 
 ---
 
+## Pro tool — sync_confluence
+
+Detects stale doc comments in a file, generates updated documentation via Claude, and writes the results to the matching Confluence page (creates it if it doesn't exist).
+
+**Required env vars:**
+
+| Variable | Description |
+|----------|-------------|
+| `CONFLUENCE_BASE_URL` | Your Confluence Cloud URL, e.g. `https://mycompany.atlassian.net/wiki` |
+| `CONFLUENCE_EMAIL` | Atlassian account email |
+| `CONFLUENCE_API_TOKEN` | API token from [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens) |
+| `CONFLUENCE_SPACE_KEY` | Target space key, e.g. `DEV` (visible in the space URL) |
+
+**Usage in Claude:**
+```
+sync_confluence on /path/to/repo for src/Tax.cs
+```
+
+Creates or updates a `[LivingDocs] Tax` page in your Confluence space with Claude's suggested documentation updates and confidence scores.
+
+---
+
+## Pro tool — scan_org
+
+Scans every repository in a GitHub organisation and returns an org-wide staleness report. Shallow-clones each repo, runs stale-doc detection, then cleans up.
+
+**Required env vars:**
+
+| Variable | Description |
+|----------|-------------|
+| `GITHUB_TOKEN` | Personal access token with `repo` and `read:org` scopes — required for private repos and higher API rate limits |
+
+**Usage in Claude:**
+```
+scan_org on my-company
+```
+
+**Example output:**
+```
+Org: my-company — 8 repos scanned | 142 files | 5 stale docs
+
+⚠️ Repos with stale docs
+api-service — 3 stale / 48 files
+  - src/Auth.cs (100%)
+  - src/Tax.cs (80%)
+  - src/Payment.cs (40%)
+
+payment-service — 2 stale / 31 files
+  - src/Refund.cs (60%)
+  - src/Invoice.cs (20%)
+
+✅ Clean repos (6)
+frontend, user-service, admin-api, ...
+```
+
+---
+
 ## Environment variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `ANTHROPIC_API_KEY` | Yes (for `query_docs` and `suggest_doc_update`) | Anthropic API key |
 | `LIVINGDOCS_LICENSE_KEY` | Yes (for Pro tools) | License key from Polar.sh |
+| `GITHUB_TOKEN` | Yes (for `scan_org` with private repos) | GitHub personal access token with `repo` + `read:org` scopes |
+| `CONFLUENCE_BASE_URL` | Yes (for `sync_confluence`) | Confluence Cloud base URL |
+| `CONFLUENCE_EMAIL` | Yes (for `sync_confluence`) | Atlassian account email |
+| `CONFLUENCE_API_TOKEN` | Yes (for `sync_confluence`) | Atlassian API token |
+| `CONFLUENCE_SPACE_KEY` | Yes (for `sync_confluence`) | Confluence space key, e.g. `DEV` |
 
 ## Supported languages
 
@@ -176,27 +238,29 @@ make scan REPO=/path/to/your/repo
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────┐
-│                  Interfaces                  │
-│  Claude Desktop │ Claude Code │ VS Copilot  │
-└───────┬─────────────────────────────┬────────┘
-        │                             │
-   livingdocs-mcp              (coming soon)
-   (MCP server)              LivingDocs.CopilotExt
-        │
-   LivingDocs.Core
-   ┌────┴────────────────┐
+┌──────────────────────────────────────────────────────┐
+│                     Interfaces                        │
+│  Claude Desktop │ Claude Code │ VS Copilot │ GitHub  │
+└───────┬──────────────────────────────────┬───────────┘
+        │                                  │
+   livingdocs-mcp                  LivingDocs.CopilotExt
+   (MCP server)                    /api/copilot/chat  (SSE)
+        │                          /api/github/webhook
+        └──────────────┬───────────┘
+                LivingDocs.Core
+   ┌────────────────┴────────────────────┐
 GitScanner  DocExtractor  StaleDocDetector  ClaudeService
+DocWriterService  ConfluenceService  GitHubOrgService
 ```
 
 ## Projects
 
 | Project | Purpose |
 |---------|---------|
-| `LivingDocs.Core` | Shared engine — git scanning, doc extraction, stale detection, Claude API |
+| `LivingDocs.Core` | Shared engine — git scanning, doc extraction, stale detection, Claude API, Confluence sync, org scanning |
 | `LivingDocs.McpServer` | CLI + MCP server — published as `LivingDocs.Mcp` on NuGet |
-| `LivingDocs.CopilotExt` | GitHub Copilot Extension webhook (coming soon) |
-| `LivingDocs.Tests` | xUnit test suite |
+| `LivingDocs.CopilotExt` | GitHub Copilot Extension — SSE chat endpoint + PR merge webhook |
+| `LivingDocs.Tests` | xUnit test suite (62 tests) |
 
 ## Feedback & Support
 
