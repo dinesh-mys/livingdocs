@@ -151,8 +151,17 @@ static async Task RunQueryAsync(string repoPath, string question)
     var results = await search.SearchAsync(question, topK: 10);
     Console.WriteLine($"BM25 results: {results.Count}");
     if (results.Count == 0) { Console.WriteLine("No relevant docs found."); return; }
-    var answer = await claude.QueryDocsAsync(question, results.Select(r => r.Chunk));
-    Console.WriteLine(answer);
+    try
+    {
+        var answer = await claude.QueryDocsAsync(question, results.Select(r => r.Chunk));
+        Console.WriteLine(answer);
+    }
+    catch (HttpRequestException ex) when (ex.Message.Contains("401") || ex.Message.Contains("authentication"))
+    {
+        Console.Error.WriteLine("Error: ANTHROPIC_API_KEY is invalid or not set.");
+        Console.Error.WriteLine("Set it in your environment or add it to a .env file in the current directory.");
+        Environment.Exit(1);
+    }
 }
 
 // Claude is only needed at search/rerank time, not during index builds.
