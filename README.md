@@ -122,6 +122,8 @@ VS Code 1.99+ supports MCP servers in Copilot agent mode. Add a `.vscode/mcp.jso
 
 Open the Copilot chat panel, switch to **Agent mode**, and the `scan_repo`, `query_docs`, and `suggest_doc_update` tools will be available.
 
+> **Note:** The `@livingdocs` Copilot Extension agent is built and deployed but pending GitHub Copilot plan availability for agent URL registration. The MCP server path above works fully in the meantime.
+
 ---
 
 ## Pro tier
@@ -259,7 +261,7 @@ DocWriterService  ConfluenceService  GitHubOrgService
 |---------|---------|
 | `LivingDocs.Core` | Shared engine — git scanning, doc extraction, stale detection, Claude API, Confluence sync, org scanning |
 | `LivingDocs.McpServer` | CLI + MCP server — published as `LivingDocs.Mcp` on NuGet |
-| `LivingDocs.CopilotExt` | GitHub Copilot Extension — SSE chat endpoint + PR merge webhook |
+| `LivingDocs.CopilotExt` | GitHub Copilot Extension — SSE chat endpoint + PR merge webhook (agent URL registration pending GitHub plan availability) |
 | `LivingDocs.Tests` | xUnit test suite (62 tests) |
 
 ## Feedback & Support
