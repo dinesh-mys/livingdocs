@@ -1,0 +1,62 @@
+name: Deploy CopilotExt to Azure App Service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/LivingDocs.Core/**'
+      - 'src/LivingDocs.CopilotExt/**'
+      - 'Dockerfile'
+      - '.github/workflows/deploy.yml'
+
+  workflow_dispatch:  # allow manual trigger from GitHub Actions tab
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.ACR_LOGIN_SERVER }}/livingdocs-copilot:latest
+            ${{ secrets.ACR_LOGIN_SERVER }}/livingdocs-copilot:${{ github.sha }}
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_APP_NAME }}
+          images: ${{ secrets.ACR_LOGIN_SERVER }}/livingdocs-copilot:${{ github.sha }}
+
+      - name: Set App Service environment variables
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az webapp config appsettings set \
+              --name ${{ secrets.AZURE_APP_NAME }} \
+              --resource-group livingdocs-rsg \
+              --settings \
+                ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
+                GITHUB_TOKEN="${{ secrets.GH_TOKEN }}" \
+                GITHUB_WEBHOOK_SECRET="${{ secrets.GITHUB_WEBHOOK_SECRET }}" \
+                WEBSITES_PORT=8080
