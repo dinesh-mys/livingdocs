@@ -63,7 +63,8 @@ public static class GitHubWebhookHandler
 
     private static bool ValidateSignature(HttpRequest request, byte[] body)
     {
-        var secret = Environment.GetEnvironmentVariable("GITHUB_WEBHOOK_SECRET");
+        var secret = Environment.GetEnvironmentVariable("GITHUB_WEBHOOK_SECRET")
+                  ?? Environment.GetEnvironmentVariable("LIVINGDOCS_WEBHOOK_SECRET");
         if (string.IsNullOrEmpty(secret)) return false;
 
         var signature = request.Headers["X-Hub-Signature-256"].ToString();
