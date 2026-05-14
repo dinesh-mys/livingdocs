@@ -18,10 +18,6 @@ WORKDIR /app
 
 COPY --from=build /app/publish .
 
-# Non-root user for least-privilege execution
-RUN useradd -m appuser && chown -R appuser:appuser /app
-USER appuser
-
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
