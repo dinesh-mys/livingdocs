@@ -200,6 +200,9 @@ file sealed class FakeScanner(IEnumerable<ChangeEvent> events) : IGitScannerServ
 {
     public Task<IEnumerable<ChangeEvent>> ScanAsync(string repoPath, string? sinceCommit = null)
         => Task.FromResult(events);
+
+    public Task<string?> GetSymbolContextAsync(string repoPath, string filePath, string symbolName, int contextLines = 30)
+        => Task.FromResult<string?>(null);
 }
 
 file sealed class FakeExtractor(IEnumerable<DocChunk> chunks) : IDocExtractorService

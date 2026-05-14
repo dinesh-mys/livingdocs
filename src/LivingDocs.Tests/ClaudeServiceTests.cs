@@ -110,7 +110,7 @@ public class ClaudeServiceTests
 
         var result = await sut.SuggestDocUpdateAsync(change, doc);
 
-        Assert.Equal("/// Calculates tax at 20%.", result);
+        Assert.Equal("/// Calculates tax at 20%.", result.Suggestion);
     }
 
     // ── QueryDocsAsync ────────────────────────────────────────────────────
