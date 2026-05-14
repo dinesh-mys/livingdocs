@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Text;
 using LivingDocs.Core.Interfaces;
+using LivingDocs.Core.Services;
 using ModelContextProtocol.Server;
 using LivingDocs.Core.Models;
 
@@ -109,16 +110,20 @@ public static class LivingDocsTools
     [McpServerTool(Name = "suggest_doc_update")]
     [Description(
         "Use Claude to suggest an updated documentation comment for a specific file, " +
-        "based on its most recent code diff. Requires ANTHROPIC_API_KEY to be set.")]
+        "based on its most recent code diff. Requires ANTHROPIC_API_KEY to be set. " +
+        "Set format='patch' to get a unified diff (--- / +++ / @@) ready for git apply.")]
     public static async Task<string> SuggestDocUpdate(
         IClaudeService claude,
         IGitScannerService scanner,
         IDocExtractorService extractor,
         [Description("Absolute path to the git repository")] string repoPath,
-        [Description("File path relative to the repository root, e.g. src/Tax.cs")] string filePath)
+        [Description("File path relative to the repository root, e.g. src/Tax.cs")] string filePath,
+        [Description("Output format: 'text' (default) returns the suggested comment; 'patch' returns a unified diff ready for git apply")] string format = "text")
     {
         if (!Directory.Exists(repoPath))
             return $"Error: repository not found — {repoPath}";
+
+        var asPatch = string.Equals(format, "patch", StringComparison.OrdinalIgnoreCase);
 
         var changes = (await scanner.ScanAsync(repoPath))
             .Where(c => string.Equals(c.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
@@ -143,9 +148,33 @@ public static class LivingDocsTools
 
         foreach (var chunk in chunks)
         {
-            var suggestion = await claude.SuggestDocUpdateAsync(latestChange, chunk);
+            var symbolContext = chunk.ParentSymbol is not null
+                ? await scanner.GetSymbolContextAsync(repoPath, filePath, chunk.ParentSymbol)
+                : null;
+
+            var result = await claude.SuggestDocUpdateAsync(latestChange, chunk, symbolContext);
+
             sb.AppendLine($"### {chunk.ParentSymbol ?? "unknown"}");
-            sb.AppendLine(suggestion);
+
+            if (result.NeedsReview)
+                sb.AppendLine($"⚠️ LOW CONFIDENCE ({result.Confidence:P0}) — please review before applying");
+            else
+                sb.AppendLine($"✓ Confidence: {result.Confidence:P0}");
+
+            sb.AppendLine();
+
+            if (asPatch)
+            {
+                var patch = DocPatchFormatter.Format(chunk.Content, result.Suggestion, filePath, chunk.LineNumber);
+                sb.AppendLine("```diff");
+                sb.AppendLine(patch);
+                sb.AppendLine("```");
+            }
+            else
+            {
+                sb.AppendLine(result.Suggestion);
+            }
+
             sb.AppendLine();
         }
 

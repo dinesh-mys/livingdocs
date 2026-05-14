@@ -108,6 +108,33 @@ public class GitScannerService : IGitScannerService
         return await RunGitAsync(repoPath, $"show {commitHash} -- \"{filePath}\"");
     }
 
+    public async Task<string?> GetSymbolContextAsync(
+        string repoPath, string filePath, string symbolName, int contextLines = 30)
+    {
+        var fullPath = Path.Combine(repoPath, filePath);
+        if (!File.Exists(fullPath)) return null;
+
+        var lines = await File.ReadAllLinesAsync(fullPath);
+
+        int symbolLine = -1;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (lines[i].Contains(symbolName, StringComparison.Ordinal))
+            {
+                symbolLine = i;
+                break;
+            }
+        }
+
+        if (symbolLine < 0) return null;
+
+        var start  = Math.Max(0, symbolLine - contextLines);
+        var end    = Math.Min(lines.Length - 1, symbolLine + contextLines);
+        var window = lines[start..(end + 1)];
+
+        return string.Join('\n', window.Select((l, i) => $"{start + i + 1,4}: {l}"));
+    }
+
     internal static async Task<string> RunGitAsync(string repoPath, string arguments)
     {
         var psi = new ProcessStartInfo("git", arguments)

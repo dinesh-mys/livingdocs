@@ -78,8 +78,13 @@ public class ClaudeService : IClaudeService
         throw new HttpRequestException($"Claude API failed after {MaxRetries} attempts.");
     }
 
-    public async Task<string> SuggestDocUpdateAsync(ChangeEvent change, DocChunk existingDoc)
+    public async Task<DocSuggestion> SuggestDocUpdateAsync(
+        ChangeEvent change, DocChunk existingDoc, string? symbolContext = null)
     {
+        var contextBlock = symbolContext is not null
+            ? $"\nCURRENT CODE (surrounding context):\n{symbolContext}\n"
+            : string.Empty;
+
         var prompt = $"""
             You are a documentation assistant. A developer changed code and the existing
             documentation may now be stale. Suggest a concise updated doc comment only —
@@ -94,11 +99,40 @@ public class ClaudeService : IClaudeService
 
             CODE CHANGE (diff):
             {change.Diff}
-
-            Write the updated documentation comment:
+            {contextBlock}
+            Write the updated documentation comment, then on the very last line write:
+            CONFIDENCE: <score between 0.0 and 1.0>
+            where 1.0 means you are certain the suggestion is correct and 0.0 means you are guessing.
             """;
 
-        return await CompleteAsync(prompt, maxTokens: 512);
+        var raw        = await CompleteAsync(prompt, maxTokens: 600);
+        var (text, confidence) = ParseConfidence(raw);
+        return new DocSuggestion(text, confidence, NeedsReview: confidence < ConfidenceThreshold);
+    }
+
+    private const float ConfidenceThreshold = 0.6f;
+
+    private static (string text, float confidence) ParseConfidence(string raw)
+    {
+        var lines = raw.TrimEnd().Split('\n');
+
+        for (int i = lines.Length - 1; i >= Math.Max(0, lines.Length - 3); i--)
+        {
+            var line = lines[i].Trim();
+            if (line.StartsWith("CONFIDENCE:", StringComparison.OrdinalIgnoreCase))
+            {
+                var valueStr = line["CONFIDENCE:".Length..].Trim();
+                if (float.TryParse(valueStr, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var score))
+                {
+                    var suggestion = string.Join('\n', lines[..i]).TrimEnd();
+                    return (suggestion, Math.Clamp(score, 0f, 1f));
+                }
+            }
+        }
+
+        // Claude didn't emit a score — return the full text with neutral confidence.
+        return (raw.TrimEnd(), 0.5f);
     }
 
     public async Task<string> QueryDocsAsync(string question, IEnumerable<DocChunk> docs)
