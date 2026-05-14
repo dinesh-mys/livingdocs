@@ -16,11 +16,11 @@ RUN dotnet publish src/LivingDocs.CopilotExt/LivingDocs.CopilotExt.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# Non-root user for least-privilege execution
-RUN useradd -m appuser
-USER appuser
-
 COPY --from=build /app/publish .
+
+# Non-root user for least-privilege execution
+RUN useradd -m appuser && chown -R appuser:appuser /app
+USER appuser
 
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080

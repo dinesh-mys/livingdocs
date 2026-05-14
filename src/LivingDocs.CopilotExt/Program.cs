@@ -20,6 +20,7 @@ builder.Services
 
 var app = builder.Build();
 
+app.MapGet("/health", () => Results.Ok("ok"));
 app.MapPost("/api/copilot/chat", CopilotChatEndpoint.HandleAsync);
 app.MapPost("/api/github/webhook", GitHubWebhookHandler.HandleAsync);
 
