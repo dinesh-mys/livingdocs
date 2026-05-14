@@ -2,6 +2,8 @@ using LivingDocs.Core.Interfaces;
 using LivingDocs.Core.Services;
 using LivingDocs.Core.Models;
 
+try
+{
 LoadDotEnv();
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,10 +23,28 @@ builder.Services
 var app = builder.Build();
 
 app.MapGet("/health", () => Results.Ok("ok"));
+app.MapGet("/startup-error", () =>
+{
+    var f = "/tmp/startup-error.txt";
+    return File.Exists(f) ? Results.Text(File.ReadAllText(f)) : Results.Ok("no startup error");
+});
 app.MapPost("/api/copilot/chat", CopilotChatEndpoint.HandleAsync);
 app.MapPost("/api/github/webhook", GitHubWebhookHandler.HandleAsync);
 
 app.Run();
+}
+catch (Exception ex)
+{
+    var msg = ex.ToString();
+    Console.Error.WriteLine(msg);
+    File.WriteAllText("/tmp/startup-error.txt", msg);
+
+    // Serve the error on port 8080 so Azure doesn't show a blank error
+    var fallback = WebApplication.Create();
+    fallback.MapGet("/", () => Results.Text(msg));
+    fallback.MapGet("/health", () => Results.Text(msg));
+    await fallback.RunAsync("http://+:8080");
+}
 
 static void LoadDotEnv()
 {
