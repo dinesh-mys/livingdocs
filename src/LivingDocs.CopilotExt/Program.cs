@@ -1,5 +1,6 @@
 using LivingDocs.Core.Interfaces;
 using LivingDocs.Core.Services;
+using LivingDocs.Core.Models;
 
 LoadDotEnv();
 
@@ -13,11 +14,14 @@ builder.Services
         catch  { return new NullClaudeService(); }
     })
     .AddSingleton<IDocExtractorService, DocExtractorService>()
+    .AddSingleton<IGitScannerService, GitScannerService>()
+    .AddSingleton<IStaleDocDetectorService, StaleDocDetectorService>()
     .AddSingleton<ISemanticSearchServiceFactory, ClaudeAssistedSearchFactory>();
 
 var app = builder.Build();
 
 app.MapPost("/api/copilot/chat", CopilotChatEndpoint.HandleAsync);
+app.MapPost("/api/github/webhook", GitHubWebhookHandler.HandleAsync);
 
 app.Run();
 

@@ -38,6 +38,12 @@ if (args is ["query", var queryRepo, .. var questionParts])
     return;
 }
 
+if (args is ["watch", var watchRepo])
+{
+    await RunWatchAsync(watchRepo);
+    return;
+}
+
 // MCP server mode — stdio transport (Claude Desktop / Claude Code)
 // Logging is suppressed so host output never corrupts the stdio JSON-RPC stream.
 var builder = Host.CreateApplicationBuilder(args);
@@ -54,7 +60,8 @@ builder.Services
     })
     .AddSingleton<ILicenseService>(_ => new LicenseService(new HttpClient()))
     .AddSingleton<ISemanticSearchServiceFactory, ClaudeAssistedSearchFactory>()
-    .AddSingleton<IIndexService, IndexService>();
+    .AddSingleton<IIndexService, IndexService>()
+    .AddSingleton<IDocWriterService, DocWriterService>();
 
 builder.Services
     .AddMcpServer()
@@ -192,6 +199,109 @@ static async Task RunInstallHooksAsync(string repoPath)
 
     Console.WriteLine($"Installed post-commit hook at {hookPath}");
     Console.WriteLine("The index will update automatically on every commit.");
+}
+
+static async Task RunWatchAsync(string repoPath)
+{
+    if (!Directory.Exists(repoPath))
+    {
+        Console.Error.WriteLine($"Directory not found: {repoPath}");
+        Environment.Exit(1);
+    }
+
+    var claude    = TryCreateClaude();
+    var factory   = new ClaudeAssistedSearchFactory(claude);
+    var indexer   = new IndexService(new DocExtractorService(), factory);
+    var scanner   = new GitScannerService();
+    var extractor = new DocExtractorService();
+    var detector  = new StaleDocDetectorService(scanner, extractor);
+
+    // Debounce table — ignore duplicate events within 1 second.
+    var lastFired = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+
+    var cts = new CancellationTokenSource();
+    Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+
+    using var watcher = new FileSystemWatcher(repoPath)
+    {
+        IncludeSubdirectories = true,
+        NotifyFilter          = NotifyFilters.LastWrite | NotifyFilters.FileName,
+        EnableRaisingEvents   = true
+    };
+
+    var queue = new System.Collections.Concurrent.ConcurrentQueue<string>();
+
+    void Enqueue(string fullPath)
+    {
+        var ext = Path.GetExtension(fullPath);
+        if (!new[] { ".cs", ".ts", ".tsx", ".js", ".jsx", ".py" }.Contains(ext)) return;
+
+        var rel = Path.GetRelativePath(repoPath, fullPath);
+        if (rel.Split(Path.DirectorySeparatorChar)
+               .Any(p => p is "bin" or "obj" or "node_modules" or ".git" or ".livingdocs"))
+            return;
+
+        if (lastFired.TryGetValue(rel, out var last) && (DateTime.UtcNow - last).TotalSeconds < 1)
+            return;
+
+        lastFired[rel] = DateTime.UtcNow;
+        queue.Enqueue(rel);
+    }
+
+    watcher.Changed += (_, e) => Enqueue(e.FullPath);
+    watcher.Created += (_, e) => Enqueue(e.FullPath);
+
+    Console.WriteLine($"Watching {repoPath}");
+    Console.WriteLine("Press Ctrl+C to stop.\n");
+
+    while (!cts.Token.IsCancellationRequested)
+    {
+        if (queue.TryDequeue(out var relPath))
+        {
+            var timestamp = DateTime.Now.ToString("HH:mm:ss");
+            Console.Write($"[{timestamp}] {relPath} saved — ");
+
+            try
+            {
+                await indexer.ReIndexFileAsync(repoPath, relPath);
+
+                var result   = await detector.DetectAsync(repoPath);
+                var fileStale = result.StaleDocs
+                    .Where(d => string.Equals(d.FilePath, relPath, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(d => d.StaleScore)
+                    .ToList();
+
+                if (fileStale.Count == 0)
+                {
+                    Console.WriteLine("re-indexed, docs look fresh");
+                }
+                else
+                {
+                    Console.WriteLine($"re-indexed | {fileStale.Count} stale doc(s):");
+                    foreach (var doc in fileStale)
+                    {
+                        var bar = new string('█', (int)(doc.StaleScore * 10)).PadRight(10, '░');
+                        Console.WriteLine($"  [{bar}] {doc.StaleScore:P0}  " +
+                            $"doc:{doc.DocLastUpdated:yyyy-MM-dd}  " +
+                            $"code:{doc.CodeLastChanged:yyyy-MM-dd}");
+                    }
+                    Console.WriteLine($"  → run: suggest_doc_update on {repoPath} {relPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"error — {ex.Message}");
+            }
+
+            Console.WriteLine();
+        }
+        else
+        {
+            await Task.Delay(200, cts.Token).ContinueWith(_ => { });
+        }
+    }
+
+    Console.WriteLine("\nWatcher stopped.");
 }
 
 static void LoadDotEnv()

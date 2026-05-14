@@ -180,4 +180,83 @@ public static class LivingDocsTools
 
         return sb.ToString().TrimEnd();
     }
+
+    [McpServerTool(Name = "write_back")]
+    [Description(
+        "Generate an updated doc comment for every symbol in a file and write it directly " +
+        "back to disk. Low-confidence suggestions (< 60%) are skipped and listed separately " +
+        "for manual review. Requires ANTHROPIC_API_KEY to be set.")]
+    public static async Task<string> WriteBack(
+        IClaudeService claude,
+        IGitScannerService scanner,
+        IDocExtractorService extractor,
+        IDocWriterService writer,
+        [Description("Absolute path to the git repository")] string repoPath,
+        [Description("File path relative to the repository root, e.g. src/Tax.cs")] string filePath)
+    {
+        if (!Directory.Exists(repoPath))
+            return $"Error: repository not found — {repoPath}";
+
+        var changes = (await scanner.ScanAsync(repoPath))
+            .Where(c => string.Equals(c.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(c => c.Timestamp)
+            .ToList();
+
+        if (changes.Count == 0)
+            return $"No recent changes found for '{filePath}'. Has this file been committed?";
+
+        var fullPath = Path.Combine(repoPath, filePath);
+        if (!File.Exists(fullPath))
+            return $"Error: file not found — {filePath}";
+
+        var content = await File.ReadAllTextAsync(fullPath);
+        var chunks  = (await extractor.ExtractAsync(filePath, content)).ToList();
+
+        if (chunks.Count == 0)
+            return $"No documentation comments found in '{filePath}'.";
+
+        var latestChange = changes[0];
+        var written      = new List<string>();
+        var skipped      = new List<string>();
+
+        // Process in reverse line order so earlier line numbers remain valid after each splice.
+        foreach (var chunk in chunks.OrderByDescending(c => c.LineNumber))
+        {
+            var symbolContext = chunk.ParentSymbol is not null
+                ? await scanner.GetSymbolContextAsync(repoPath, filePath, chunk.ParentSymbol)
+                : null;
+
+            var result = await claude.SuggestDocUpdateAsync(latestChange, chunk, symbolContext);
+
+            if (result.NeedsReview)
+            {
+                skipped.Add($"• {chunk.ParentSymbol ?? "unknown"} (confidence {result.Confidence:P0})");
+                continue;
+            }
+
+            await writer.WriteBackAsync(repoPath, filePath, chunk, result.Suggestion);
+            written.Add($"• {chunk.ParentSymbol ?? "unknown"} (confidence {result.Confidence:P0})");
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"write_back complete for `{filePath}`");
+        sb.AppendLine();
+
+        if (written.Count > 0)
+        {
+            sb.AppendLine($"**Written ({written.Count}):**");
+            written.ForEach(l => sb.AppendLine(l));
+        }
+
+        if (skipped.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"**Skipped — low confidence ({skipped.Count}), review manually:**");
+            skipped.ForEach(l => sb.AppendLine(l));
+            sb.AppendLine();
+            sb.AppendLine("Run `suggest_doc_update` on this file to review the suggestions before applying.");
+        }
+
+        return sb.ToString().TrimEnd();
+    }
 }
