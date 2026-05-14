@@ -17,7 +17,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 # Non-root user for least-privilege execution
-RUN adduser --disabled-password --gecos "" appuser
+RUN useradd -m appuser
 USER appuser
 
 COPY --from=build /app/publish .
