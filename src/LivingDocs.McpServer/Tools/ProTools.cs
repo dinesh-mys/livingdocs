@@ -117,21 +117,131 @@ public static class ProTools
 
     [McpServerTool(Name = "scan_org")]
     [Description(
-        "PRO — Scan every repository in a GitHub organisation and return a staleness report " +
-        "across all repos. Requires LIVINGDOCS_LICENSE_KEY to be set.")]
+        "PRO — Scan every repository in a GitHub organisation and return an org-wide staleness " +
+        "report. Clones each repo to a temp directory, runs stale-doc detection, then cleans up. " +
+        "Requires LIVINGDOCS_LICENSE_KEY and GITHUB_TOKEN (for private repos + higher rate limits).")]
     public static async Task<string> ScanOrg(
-        ILicenseService license,
-        [Description("GitHub organisation name, e.g. my-company")] string orgName)
+        ILicenseService          license,
+        IStaleDocDetectorService detector,
+        IGitHubOrgService        github,
+        [Description("GitHub organisation or user name, e.g. my-company")] string orgName,
+        [Description("Maximum number of repos to scan (default 20)")] int maxRepos = 20)
     {
-        var error = await LicenseGuard.RequireProAsync(license);
-        if (error is not null) return error;
+        var licenseError = await LicenseGuard.RequireProAsync(license);
+        if (licenseError is not null) return licenseError;
 
-        // TODO: implement org-wide scan
-        // 1. List repos via GitHub API (GITHUB_TOKEN env var)
-        // 2. Clone / fetch each repo
-        // 3. Run StaleDocDetectorService on each
-        // 4. Return aggregated staleness report
-        return $"[scan_org] Coming soon — will scan all repos in '{orgName}'.";
+        // ── 1. List repos ──────────────────────────────────────────────────────
+        List<GitHubRepo> repos;
+        try
+        {
+            repos = await github.ListReposAsync(orgName, maxRepos);
+        }
+        catch (HttpRequestException ex) when (ex.Message.Contains("404"))
+        {
+            return $"Organisation '{orgName}' not found. Check the name and ensure GITHUB_TOKEN has org read access.";
+        }
+
+        if (repos.Count == 0)
+            return $"No repositories found in '{orgName}'.";
+
+        // ── 2. Clone each repo, scan, clean up ────────────────────────────────
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"livingdocs-org-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+
+        var results  = new List<(string Repo, int StaleCount, int TotalFiles, List<string> TopStale)>();
+        var failed   = new List<string>();
+
+        foreach (var repo in repos)
+        {
+            var repoDir = Path.Combine(tempRoot, repo.Name);
+            try
+            {
+                // Shallow clone — fast, only needs recent history for staleness
+                await RunGitCloneAsync(repo.CloneUrl, repoDir, repo.DefaultBranch);
+
+                var scan      = await detector.DetectAsync(repoDir);
+                var topStale  = scan.StaleDocs
+                    .OrderByDescending(d => d.StaleScore)
+                    .Take(3)
+                    .Select(d => $"{d.FilePath} ({d.StaleScore:P0})")
+                    .ToList();
+
+                results.Add((repo.Name, scan.StaleDocs.Count, scan.TotalFiles, topStale));
+            }
+            catch
+            {
+                failed.Add(repo.Name);
+            }
+            finally
+            {
+                if (Directory.Exists(repoDir))
+                    Directory.Delete(repoDir, recursive: true);
+            }
+        }
+
+        Directory.Delete(tempRoot, recursive: true);
+
+        // ── 3. Format report ──────────────────────────────────────────────────
+        var sb = new StringBuilder();
+        sb.AppendLine($"## 🏢 LivingDocs — Org Scan: {orgName}");
+        sb.AppendLine();
+        sb.AppendLine($"Scanned **{results.Count}** repo(s) | " +
+                      $"**{results.Sum(r => r.TotalFiles)}** files examined | " +
+                      $"**{results.Sum(r => r.StaleCount)}** stale doc(s) found");
+        sb.AppendLine();
+
+        var staleRepos  = results.Where(r => r.StaleCount > 0)
+                                 .OrderByDescending(r => r.StaleCount).ToList();
+        var cleanRepos  = results.Where(r => r.StaleCount == 0).ToList();
+
+        if (staleRepos.Count > 0)
+        {
+            sb.AppendLine("### ⚠️ Repos with stale docs");
+            sb.AppendLine();
+            foreach (var (repo, staleCount, totalFiles, topStale) in staleRepos)
+            {
+                sb.AppendLine($"**{repo}** — {staleCount} stale / {totalFiles} files");
+                foreach (var s in topStale)
+                    sb.AppendLine($"  - {s}");
+                sb.AppendLine();
+            }
+        }
+
+        if (cleanRepos.Count > 0)
+        {
+            sb.AppendLine($"### ✅ Clean repos ({cleanRepos.Count})");
+            sb.AppendLine(string.Join(", ", cleanRepos.Select(r => r.Repo)));
+            sb.AppendLine();
+        }
+
+        if (failed.Count > 0)
+        {
+            sb.AppendLine($"### ⚡ Skipped (clone failed)");
+            sb.AppendLine(string.Join(", ", failed));
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    private static async Task RunGitCloneAsync(string cloneUrl, string targetDir, string branch)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo("git",
+            $"clone --depth=50 --single-branch --branch {branch} {cloneUrl} \"{targetDir}\"")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError  = true,
+            UseShellExecute        = false,
+            CreateNoWindow         = true
+        };
+
+        using var process = System.Diagnostics.Process.Start(psi)!;
+        await process.WaitForExitAsync();
+
+        if (process.ExitCode != 0)
+        {
+            var err = await process.StandardError.ReadToEndAsync();
+            throw new InvalidOperationException($"git clone failed: {err}");
+        }
     }
 
     private static string EscapeHtml(string text) =>

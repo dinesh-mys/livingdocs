@@ -66,6 +66,7 @@ builder.Services
     })
     .AddSingleton<ILicenseService>(_ => new LicenseService(new HttpClient()))
     .AddSingleton<IConfluenceService>(_ => new ConfluenceService(new HttpClient()))
+    .AddSingleton<IGitHubOrgService>(_ => new GitHubOrgService(new HttpClient()))
     .AddSingleton<ISemanticSearchServiceFactory, ClaudeAssistedSearchFactory>()
     .AddSingleton<IIndexService, IndexService>()
     .AddSingleton<IDocWriterService, DocWriterService>();
