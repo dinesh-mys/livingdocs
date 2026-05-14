@@ -1,5 +1,11 @@
 # LivingDocs
 
+[![NuGet Version](https://img.shields.io/nuget/v/LivingDocs.Mcp)](https://www.nuget.org/packages/LivingDocs.Mcp)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/LivingDocs.Mcp)](https://www.nuget.org/packages/LivingDocs.Mcp)
+[![GitHub Issues](https://img.shields.io/github/issues/dinesh-mys/livingdocs)](https://github.com/dinesh-mys/livingdocs/issues)
+[![GitHub Discussions](https://img.shields.io/github/discussions/dinesh-mys/livingdocs)](https://github.com/dinesh-mys/livingdocs/discussions)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 AI-powered documentation health monitor. Detects stale code comments, answers questions about your codebase, suggests updates using Claude, and works as an MCP server for Claude Desktop, Claude Code, and GitHub Copilot.
 
 ## Install
@@ -191,6 +197,12 @@ GitScanner  DocExtractor  StaleDocDetector  ClaudeService
 | `LivingDocs.McpServer` | CLI + MCP server — published as `LivingDocs.Mcp` on NuGet |
 | `LivingDocs.CopilotExt` | GitHub Copilot Extension webhook (coming soon) |
 | `LivingDocs.Tests` | xUnit test suite |
+
+## Feedback & Support
+
+- **Bug reports** → [GitHub Issues](https://github.com/dinesh-mys/livingdocs/issues/new?template=bug_report.md)
+- **Feature requests** → [GitHub Issues](https://github.com/dinesh-mys/livingdocs/issues/new?template=feature_request.md)
+- **Questions & ideas** → [GitHub Discussions](https://github.com/dinesh-mys/livingdocs/discussions)
 
 ## License
 
