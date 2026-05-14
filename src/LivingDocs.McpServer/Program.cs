@@ -65,6 +65,7 @@ builder.Services
         catch  { return new NullClaudeService(); }
     })
     .AddSingleton<ILicenseService>(_ => new LicenseService(new HttpClient()))
+    .AddSingleton<IConfluenceService>(_ => new ConfluenceService(new HttpClient()))
     .AddSingleton<ISemanticSearchServiceFactory, ClaudeAssistedSearchFactory>()
     .AddSingleton<IIndexService, IndexService>()
     .AddSingleton<IDocWriterService, DocWriterService>();
