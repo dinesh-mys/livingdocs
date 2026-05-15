@@ -155,7 +155,7 @@ Or add them to the `env` block in your config:
 
 `POLAR_ORGANIZATION_ID` is your org UUID from **Polar Dashboard → Settings**. `POLAR_ACCESS_TOKEN` is an org-level access token (Polar Dashboard → Settings → API Keys). Without these, the key is accepted based on format only — useful for local development.
 
-Get a license at **[polar.sh/novaders-llp/livingdocs](https://polar.sh/novaders-llp/livingdocs)**.
+Get a license at **[buy.polar.sh — LivingDocs Pro](https://buy.polar.sh/polar_cl_LcRKdosjt3TwpUkKBSoDOPOP6ea6ArOfKpyB91MSdiM)**.
 
 ---
 
@@ -221,7 +221,7 @@ frontend, user-service, admin-api, ...
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `ANTHROPIC_API_KEY` | Yes (for `query_docs` and `suggest_doc_update`) | Anthropic API key |
-| `LIVINGDOCS_LICENSE_KEY` | Yes (for Pro tools) | License key from [polar.sh/novaders-llp/livingdocs](https://polar.sh/novaders-llp/livingdocs) |
+| `LIVINGDOCS_LICENSE_KEY` | Yes (for Pro tools) | License key from [buy.polar.sh — LivingDocs Pro](https://buy.polar.sh/polar_cl_LcRKdosjt3TwpUkKBSoDOPOP6ea6ArOfKpyB91MSdiM) |
 | `POLAR_ORGANIZATION_ID` | Yes (for live license validation) | Polar.sh organization UUID — find it in **Polar Dashboard → Settings** |
 | `POLAR_ACCESS_TOKEN` | Yes (for live license validation) | Polar.sh org access token — required for the validation API call |
 | `POLAR_BENEFIT_ID` | No | Polar.sh benefit UUID for stricter per-benefit validation |
