@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="assets/logo.svg" alt="LivingDocs" width="360" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo.svg">
+    <img src="assets/logo.svg" alt="LivingDocs" width="360" />
+  </picture>
 </p>
 
 <p align="center">
