@@ -1,12 +1,19 @@
-# LivingDocs
+<p align="center">
+  <img src="assets/logo.svg" alt="LivingDocs" width="360" />
+</p>
 
-[![NuGet Version](https://img.shields.io/nuget/v/LivingDocs.Mcp)](https://www.nuget.org/packages/LivingDocs.Mcp)
-[![NuGet Downloads](https://img.shields.io/nuget/dt/LivingDocs.Mcp)](https://www.nuget.org/packages/LivingDocs.Mcp)
-[![GitHub Issues](https://img.shields.io/github/issues/dinesh-mys/livingdocs)](https://github.com/dinesh-mys/livingdocs/issues)
-[![GitHub Discussions](https://img.shields.io/github/discussions/dinesh-mys/livingdocs)](https://github.com/dinesh-mys/livingdocs/discussions)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<p align="center">
+  <a href="https://www.nuget.org/packages/LivingDocs.Mcp"><img src="https://img.shields.io/nuget/v/LivingDocs.Mcp" alt="NuGet Version" /></a>
+  <a href="https://www.nuget.org/packages/LivingDocs.Mcp"><img src="https://img.shields.io/nuget/dt/LivingDocs.Mcp" alt="NuGet Downloads" /></a>
+  <a href="https://github.com/dinesh-mys/livingdocs/issues"><img src="https://img.shields.io/github/issues/dinesh-mys/livingdocs" alt="GitHub Issues" /></a>
+  <a href="https://github.com/dinesh-mys/livingdocs/discussions"><img src="https://img.shields.io/github/discussions/dinesh-mys/livingdocs" alt="GitHub Discussions" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
+</p>
 
-AI-powered documentation health monitor. Detects stale code comments, answers questions about your codebase, suggests updates using Claude, and works as an MCP server for Claude Desktop, Claude Code, and GitHub Copilot.
+<p align="center">
+  AI-powered documentation health monitor. Detects stale code comments, answers questions about your codebase, suggests updates using Claude, and works as an MCP server for Claude Desktop, Claude Code, and GitHub Copilot.
+</p>
+
 
 ## Install
 
