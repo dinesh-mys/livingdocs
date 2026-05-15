@@ -1,4 +1,4 @@
-name: Publish to NuGet
+name: Publish
 
 on:
   push:
@@ -6,7 +6,8 @@ on:
       - 'v*.*.*'
 
 jobs:
-  publish:
+  nuget:
+    name: Publish to NuGet
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,3 +34,71 @@ jobs:
             --api-key ${{ secrets.NUGET_API_KEY }} \
             --source https://api.nuget.org/v3/index.json \
             --skip-duplicate
+
+  binaries:
+    name: Release self-contained binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - rid: win-x64
+            asset: livingdocs-win-x64.exe
+          - rid: linux-x64
+            asset: livingdocs-linux-x64
+          - rid: osx-x64
+            asset: livingdocs-osx-x64
+          - rid: osx-arm64
+            asset: livingdocs-osx-arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Build self-contained binary
+        run: |
+          dotnet publish src/LivingDocs.McpServer/LivingDocs.McpServer.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:Version=${{ steps.version.outputs.VERSION }} \
+            -o ./dist/${{ matrix.rid }}
+
+      - name: Rename binary
+        run: |
+          SRC=$(find ./dist/${{ matrix.rid }} -name "livingdocs*" ! -name "*.pdb" | head -1)
+          mv "$SRC" ./dist/${{ matrix.asset }}
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./dist/${{ matrix.asset }}
+          body: |
+            ## LivingDocs ${{ github.ref_name }}
+
+            ### Install via NuGet (recommended)
+            ```bash
+            dotnet tool install -g LivingDocs.Mcp
+            ```
+
+            ### Self-contained binaries (no .NET required)
+            Download the binary for your platform below and run directly.
+
+            | Platform | File |
+            |----------|------|
+            | Windows x64 | `livingdocs-win-x64.exe` |
+            | Linux x64 | `livingdocs-linux-x64` |
+            | macOS x64 | `livingdocs-osx-x64` |
+            | macOS ARM (M1/M2/M3) | `livingdocs-osx-arm64` |
+
+            ### Enterprise
+            Offline JWT license support — no internet required for license validation.
+            Azure OpenAI supported via `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_DEPLOYMENT`.
+          generate_release_notes: true

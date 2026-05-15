@@ -6,13 +6,19 @@ using LivingDocs.Core.Models;
 
 namespace LivingDocs.Core.Services;
 
-/// <summary>Calls the Anthropic Messages API. Retries up to 3 times with exponential backoff on rate-limit and server errors.</summary>
+/// <summary>
+/// Calls Anthropic Messages API by default. If AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY,
+/// and AZURE_OPENAI_DEPLOYMENT are set, routes to Azure OpenAI (chat/completions) instead.
+/// Retries up to 3 times with exponential backoff on rate-limit and server errors.
+/// </summary>
 public class ClaudeService : IClaudeService
 {
     private readonly HttpClient _httpClient;
-    private const string ApiUrl   = "https://api.anthropic.com/v1/messages";
-    private const string DefaultModel = "claude-sonnet-4-6";
-    private const int    MaxRetries = 3;
+    private readonly bool _useAzure;
+    private readonly string? _azureEndpoint;
+    private const string AnthropicUrl  = "https://api.anthropic.com/v1/messages";
+    private const string DefaultModel  = "claude-sonnet-4-6";
+    private const int    MaxRetries    = 3;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -22,41 +28,52 @@ public class ClaudeService : IClaudeService
     public ClaudeService(HttpClient httpClient, string? apiKey = null)
     {
         _httpClient = httpClient;
-        _httpClient.Timeout = TimeSpan.FromSeconds(30);
+        _httpClient.Timeout = TimeSpan.FromSeconds(60);
 
-        var key = apiKey ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
-            ?? throw new InvalidOperationException(
-                "Anthropic API key not set. Provide via constructor or ANTHROPIC_API_KEY env var.");
+        var azureEndpoint   = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
+        var azureKey        = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
+        var azureDeployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
 
-        if (!_httpClient.DefaultRequestHeaders.Contains("x-api-key"))
+        if (!string.IsNullOrWhiteSpace(azureEndpoint) &&
+            !string.IsNullOrWhiteSpace(azureKey) &&
+            !string.IsNullOrWhiteSpace(azureDeployment))
         {
-            _httpClient.DefaultRequestHeaders.Add("x-api-key", key);
-            _httpClient.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+            _useAzure     = true;
+            _azureEndpoint = $"{azureEndpoint.TrimEnd('/')}/openai/deployments/{azureDeployment}" +
+                             "/chat/completions?api-version=2024-08-01-preview";
+
+            if (!_httpClient.DefaultRequestHeaders.Contains("api-key"))
+                _httpClient.DefaultRequestHeaders.Add("api-key", azureKey);
+        }
+        else
+        {
+            var key = apiKey ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
+                ?? throw new InvalidOperationException(
+                    "No LLM configured. Set ANTHROPIC_API_KEY or AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT.");
+
+            if (!_httpClient.DefaultRequestHeaders.Contains("x-api-key"))
+            {
+                _httpClient.DefaultRequestHeaders.Add("x-api-key", key);
+                _httpClient.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+            }
         }
     }
 
     public async Task<string> CompleteAsync(string prompt, int maxTokens = 1024, string? model = null)
     {
-        var request = new ClaudeRequest(
-            Model:     model ?? DefaultModel,
-            MaxTokens: maxTokens,
-            Messages:  [new ClaudeMessage("user", prompt)]
-        );
-
         for (int attempt = 1; attempt <= MaxRetries; attempt++)
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync(ApiUrl, request);
+                var response = _useAzure
+                    ? await SendAzureAsync(prompt, maxTokens)
+                    : await SendAnthropicAsync(prompt, maxTokens, model);
 
                 if (response.IsSuccessStatusCode)
-                {
-                    var body = await response.Content.ReadFromJsonAsync<ClaudeResponse>(JsonOptions);
-                    return body?.Content.FirstOrDefault(c => c.Type == "text")?.Text
-                        ?? string.Empty;
-                }
+                    return _useAzure
+                        ? await ParseAzureResponseAsync(response)
+                        : await ParseAnthropicResponseAsync(response);
 
-                // 429 rate-limit or 5xx — retry with backoff
                 if ((int)response.StatusCode == 429 || (int)response.StatusCode >= 500)
                 {
                     if (attempt < MaxRetries)
@@ -64,10 +81,8 @@ public class ClaudeService : IClaudeService
                     continue;
                 }
 
-                // 4xx non-retriable
                 var error = await response.Content.ReadAsStringAsync();
-                throw new HttpRequestException(
-                    $"Claude API error {(int)response.StatusCode}: {error}");
+                throw new HttpRequestException($"LLM API error {(int)response.StatusCode}: {error}");
             }
             catch (TaskCanceledException) when (attempt < MaxRetries)
             {
@@ -75,7 +90,43 @@ public class ClaudeService : IClaudeService
             }
         }
 
-        throw new HttpRequestException($"Claude API failed after {MaxRetries} attempts.");
+        throw new HttpRequestException($"LLM API failed after {MaxRetries} attempts.");
+    }
+
+    private Task<HttpResponseMessage> SendAnthropicAsync(string prompt, int maxTokens, string? model)
+    {
+        var request = new ClaudeRequest(
+            Model:     model ?? DefaultModel,
+            MaxTokens: maxTokens,
+            Messages:  [new ClaudeMessage("user", prompt)]
+        );
+        return _httpClient.PostAsJsonAsync(AnthropicUrl, request);
+    }
+
+    private Task<HttpResponseMessage> SendAzureAsync(string prompt, int maxTokens)
+    {
+        var body = new
+        {
+            messages  = new[] { new { role = "user", content = prompt } },
+            max_tokens = maxTokens
+        };
+        return _httpClient.PostAsJsonAsync(_azureEndpoint, body);
+    }
+
+    private static async Task<string> ParseAnthropicResponseAsync(HttpResponseMessage response)
+    {
+        var body = await response.Content.ReadFromJsonAsync<ClaudeResponse>(JsonOptions);
+        return body?.Content.FirstOrDefault(c => c.Type == "text")?.Text ?? string.Empty;
+    }
+
+    private static async Task<string> ParseAzureResponseAsync(HttpResponseMessage response)
+    {
+        using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        return doc.RootElement
+            .GetProperty("choices")[0]
+            .GetProperty("message")
+            .GetProperty("content")
+            .GetString() ?? string.Empty;
     }
 
     public async Task<DocSuggestion> SuggestDocUpdateAsync(
@@ -105,7 +156,7 @@ public class ClaudeService : IClaudeService
             where 1.0 means you are certain the suggestion is correct and 0.0 means you are guessing.
             """;
 
-        var raw        = await CompleteAsync(prompt, maxTokens: 600);
+        var raw = await CompleteAsync(prompt, maxTokens: 600);
         var (text, confidence) = ParseConfidence(raw);
         return new DocSuggestion(text, confidence, NeedsReview: confidence < ConfidenceThreshold);
     }
@@ -131,16 +182,13 @@ public class ClaudeService : IClaudeService
             }
         }
 
-        // Claude didn't emit a score — return the full text with neutral confidence.
         return (raw.TrimEnd(), 0.5f);
     }
 
     public async Task<string> QueryDocsAsync(string question, IEnumerable<DocChunk> docs)
     {
-        var docList = docs.ToList();
-
         var context = new System.Text.StringBuilder();
-        foreach (var doc in docList)
+        foreach (var doc in docs)
         {
             var symbol = doc.ParentSymbol is not null ? $" ({doc.ParentSymbol})" : string.Empty;
             context.AppendLine($"[{doc.FilePath}:{doc.LineNumber}{symbol}]");
