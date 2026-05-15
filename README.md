@@ -145,14 +145,15 @@ Or add them to the `env` block in your config:
       "env": {
         "ANTHROPIC_API_KEY": "sk-ant-...",
         "LIVINGDOCS_LICENSE_KEY": "LD-xxxx-xxxx-xxxx",
-        "POLAR_ORGANIZATION_ID": "<your-polar-org-uuid>"
+        "POLAR_ORGANIZATION_ID": "<your-polar-org-uuid>",
+        "POLAR_ACCESS_TOKEN": "<your-polar-access-token>"
       }
     }
   }
 }
 ```
 
-`POLAR_ORGANIZATION_ID` is your Polar.sh org UUID — find it in **Polar Dashboard → Settings** or from the URL when managing your organization. Without it, the key is accepted based on format only (useful for development).
+`POLAR_ORGANIZATION_ID` is your org UUID from **Polar Dashboard → Settings**. `POLAR_ACCESS_TOKEN` is an org-level access token (Polar Dashboard → Settings → API Keys). Without these, the key is accepted based on format only — useful for local development.
 
 Get a license at **[polar.sh/novaders-llp/livingdocs](https://polar.sh/novaders-llp/livingdocs)**.
 
@@ -221,7 +222,8 @@ frontend, user-service, admin-api, ...
 |----------|----------|-------------|
 | `ANTHROPIC_API_KEY` | Yes (for `query_docs` and `suggest_doc_update`) | Anthropic API key |
 | `LIVINGDOCS_LICENSE_KEY` | Yes (for Pro tools) | License key from [polar.sh/novaders-llp/livingdocs](https://polar.sh/novaders-llp/livingdocs) |
-| `POLAR_ORGANIZATION_ID` | Yes (for live license validation) | Polar.sh organization UUID — find it in your Polar dashboard URL or Settings |
+| `POLAR_ORGANIZATION_ID` | Yes (for live license validation) | Polar.sh organization UUID — find it in **Polar Dashboard → Settings** |
+| `POLAR_ACCESS_TOKEN` | Yes (for live license validation) | Polar.sh org access token — required for the validation API call |
 | `POLAR_BENEFIT_ID` | No | Polar.sh benefit UUID for stricter per-benefit validation |
 | `GITHUB_TOKEN` | Yes (for `scan_org` with private repos) | GitHub personal access token with `repo` + `read:org` scopes |
 | `CONFLUENCE_BASE_URL` | Yes (for `sync_confluence`) | Confluence Cloud base URL |
@@ -268,7 +270,7 @@ DocWriterService  ConfluenceService  GitHubOrgService
 | `LivingDocs.Core` | Shared engine — git scanning, doc extraction, stale detection, Claude API, Confluence sync, org scanning |
 | `LivingDocs.McpServer` | CLI + MCP server — published as `LivingDocs.Mcp` on NuGet |
 | `LivingDocs.CopilotExt` | GitHub Copilot Extension — SSE chat endpoint + PR merge webhook (agent URL registration pending GitHub plan availability) |
-| `LivingDocs.Tests` | xUnit test suite (62 tests) |
+| `LivingDocs.Tests` | xUnit test suite (71 tests) |
 
 ## Feedback & Support
 
