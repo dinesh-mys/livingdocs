@@ -445,7 +445,8 @@ static void LoadDotEnv()
         var key = trimmed[..idx].Trim();
         var val = trimmed[(idx + 1)..].Trim().Trim('"');
 
-        if (!string.IsNullOrEmpty(key))
+        // Don't overwrite vars already set (e.g. from MCP env config or shell)
+        if (!string.IsNullOrEmpty(key) && Environment.GetEnvironmentVariable(key) is null)
             Environment.SetEnvironmentVariable(key, val);
     }
 }

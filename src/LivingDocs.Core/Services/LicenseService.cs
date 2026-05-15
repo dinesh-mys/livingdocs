@@ -10,6 +10,7 @@ public sealed class LicenseService : ILicenseService
     private readonly string? _key;
     private readonly string? _orgId;
     private readonly string? _benefitId;
+    private readonly string? _accessToken;
     private LicenseStatus? _cache;
 
     private const string StoreUrl    = "https://polar.sh/novaders-llp/livingdocs";
@@ -17,10 +18,11 @@ public sealed class LicenseService : ILicenseService
 
     public LicenseService(HttpClient http)
     {
-        _http      = http;
-        _key       = Environment.GetEnvironmentVariable("LIVINGDOCS_LICENSE_KEY");
-        _orgId     = Environment.GetEnvironmentVariable("POLAR_ORGANIZATION_ID");
-        _benefitId = Environment.GetEnvironmentVariable("POLAR_BENEFIT_ID");
+        _http         = http;
+        _key          = Environment.GetEnvironmentVariable("LIVINGDOCS_LICENSE_KEY");
+        _orgId        = Environment.GetEnvironmentVariable("POLAR_ORGANIZATION_ID");
+        _benefitId    = Environment.GetEnvironmentVariable("POLAR_BENEFIT_ID");
+        _accessToken  = Environment.GetEnvironmentVariable("POLAR_ACCESS_TOKEN");
     }
 
     public async Task<LicenseStatus> GetStatusAsync()
@@ -56,7 +58,13 @@ public sealed class LicenseService : ILicenseService
                 ? new { key = _key, organization_id = _orgId }
                 : new { key = _key, organization_id = _orgId, benefit_id = _benefitId };
 
-            var response = await _http.PostAsJsonAsync(ValidateUrl, payload);
+            var request = new HttpRequestMessage(HttpMethod.Post, ValidateUrl);
+            request.Content = JsonContent.Create(payload);
+            if (!string.IsNullOrWhiteSpace(_accessToken))
+                request.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
+
+            var response = await _http.SendAsync(request);
 
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 return new LicenseStatus(false, "invalid",
