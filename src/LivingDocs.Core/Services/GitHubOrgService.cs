@@ -29,7 +29,7 @@ public class GitHubOrgService : IGitHubOrgService
 
         while (result.Count < maxCount)
         {
-            var url  = $"https://api.github.com/orgs/{orgName}/repos?per_page={perPage}&page={page}&sort=updated";
+            var url  = $"https://api.github.com/orgs/{orgName}/repos?per_page={perPage}&page={page}&sort=updated&type=all";
             var json = await _http.GetStringAsync(url);
             var docs = JsonDocument.Parse(json).RootElement;
 
