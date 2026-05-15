@@ -221,7 +221,7 @@ frontend, user-service, admin-api, ...
 Enterprise licenses run fully offline — no internet required for license validation. Ideal for air-gapped environments and regulated industries.
 
 **How it works:**
-1. Contact **[support@novaders.com](mailto:support@novaders.com?subject=LivingDocs Enterprise)** with your company name and team size
+1. Contact **[dinesh@novaders.com](mailto:dinesh@novaders.com?subject=LivingDocs Enterprise)** with your company name and team size
 2. Receive a signed JWT license key and invoice
 3. Set `LIVINGDOCS_LICENSE_KEY=<jwt>` — validation happens locally, no external API calls
 
