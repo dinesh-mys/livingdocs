@@ -216,15 +216,70 @@ frontend, user-service, admin-api, ...
 
 ---
 
+## Enterprise tier
+
+Enterprise licenses run fully offline — no internet required for license validation. Ideal for air-gapped environments and regulated industries.
+
+**How it works:**
+1. Contact **[support@novaders.com](mailto:support@novaders.com?subject=LivingDocs Enterprise)** with your company name and team size
+2. Receive a signed JWT license key and invoice
+3. Set `LIVINGDOCS_LICENSE_KEY=<jwt>` — validation happens locally, no external API calls
+
+**Enterprise features:**
+- Offline JWT license validation (RSA-256 signed — works in air-gapped networks)
+- Azure OpenAI support — use your own Azure deployment instead of Anthropic
+- Self-contained binary — no .NET SDK required, download from [GitHub Releases](https://github.com/dinesh-mys/livingdocs/releases)
+- Priority support and custom invoicing (annual or one-time)
+
+**Azure OpenAI setup:**
+
+```json
+{
+  "mcpServers": {
+    "livingdocs": {
+      "command": "livingdocs-mcp",
+      "env": {
+        "LIVINGDOCS_LICENSE_KEY": "<enterprise-jwt>",
+        "AZURE_OPENAI_ENDPOINT": "https://your-resource.openai.azure.com",
+        "AZURE_OPENAI_API_KEY": "your-azure-key",
+        "AZURE_OPENAI_DEPLOYMENT": "gpt-4o"
+      }
+    }
+  }
+}
+```
+
+**Self-contained binary (no .NET SDK required):**
+
+Download the binary for your platform from [GitHub Releases](https://github.com/dinesh-mys/livingdocs/releases) and use it as the `command` in your MCP config:
+
+```json
+{
+  "mcpServers": {
+    "livingdocs": {
+      "command": "/path/to/livingdocs-linux-x64",
+      "env": {
+        "LIVINGDOCS_LICENSE_KEY": "<enterprise-jwt>"
+      }
+    }
+  }
+}
+```
+
+---
+
 ## Environment variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `ANTHROPIC_API_KEY` | Yes (for `query_docs` and `suggest_doc_update`) | Anthropic API key |
-| `LIVINGDOCS_LICENSE_KEY` | Yes (for Pro tools) | License key from [buy.polar.sh — LivingDocs Pro](https://buy.polar.sh/polar_cl_LcRKdosjt3TwpUkKBSoDOPOP6ea6ArOfKpyB91MSdiM) |
-| `POLAR_ORGANIZATION_ID` | Yes (for live license validation) | Polar.sh organization UUID — find it in **Polar Dashboard → Settings** |
-| `POLAR_ACCESS_TOKEN` | Yes (for live license validation) | Polar.sh org access token — required for the validation API call |
+| `ANTHROPIC_API_KEY` | Yes (for `query_docs` and `suggest_doc_update`) | Anthropic API key — not needed if using Azure OpenAI |
+| `LIVINGDOCS_LICENSE_KEY` | Yes (for Pro/Enterprise tools) | `LD-xxxx` key from [Polar.sh](https://buy.polar.sh/polar_cl_LcRKdosjt3TwpUkKBSoDOPOP6ea6ArOfKpyB91MSdiM) or JWT key from Novaders LLP |
+| `POLAR_ORGANIZATION_ID` | Yes (for live Pro license validation) | Polar.sh organization UUID — find it in **Polar Dashboard → Settings** |
+| `POLAR_ACCESS_TOKEN` | Yes (for live Pro license validation) | Polar.sh org access token — required for the validation API call |
 | `POLAR_BENEFIT_ID` | No | Polar.sh benefit UUID for stricter per-benefit validation |
+| `AZURE_OPENAI_ENDPOINT` | Enterprise | Azure OpenAI resource endpoint, e.g. `https://your-resource.openai.azure.com` |
+| `AZURE_OPENAI_API_KEY` | Enterprise | Azure OpenAI API key |
+| `AZURE_OPENAI_DEPLOYMENT` | Enterprise | Azure OpenAI deployment name, e.g. `gpt-4o` |
 | `GITHUB_TOKEN` | Yes (for `scan_org` with private repos) | GitHub personal access token with `repo` + `read:org` scopes |
 | `CONFLUENCE_BASE_URL` | Yes (for `sync_confluence`) | Confluence Cloud base URL |
 | `CONFLUENCE_EMAIL` | Yes (for `sync_confluence`) | Atlassian account email |
