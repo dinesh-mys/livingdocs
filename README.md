@@ -128,13 +128,14 @@ Open the Copilot chat panel, switch to **Agent mode**, and the `scan_repo`, `que
 
 ## Pro tier
 
-Pro tools require a license key set as an environment variable:
+Pro tools require a license key and your Polar.sh organization ID:
 
 ```bash
 export LIVINGDOCS_LICENSE_KEY=LD-xxxx-xxxx-xxxx
+export POLAR_ORGANIZATION_ID=<your-polar-org-uuid>
 ```
 
-Or add it to the `env` block in your config:
+Or add them to the `env` block in your config:
 
 ```json
 {
@@ -143,14 +144,17 @@ Or add it to the `env` block in your config:
       "command": "livingdocs-mcp",
       "env": {
         "ANTHROPIC_API_KEY": "sk-ant-...",
-        "LIVINGDOCS_LICENSE_KEY": "LD-xxxx-xxxx-xxxx"
+        "LIVINGDOCS_LICENSE_KEY": "LD-xxxx-xxxx-xxxx",
+        "POLAR_ORGANIZATION_ID": "<your-polar-org-uuid>"
       }
     }
   }
 }
 ```
 
-Get a license at **[polar.sh/dinesh-mys/livingdocs](https://polar.sh/dinesh-mys/livingdocs)**.
+`POLAR_ORGANIZATION_ID` is your Polar.sh org UUID — find it in **Polar Dashboard → Settings** or from the URL when managing your organization. Without it, the key is accepted based on format only (useful for development).
+
+Get a license at **[polar.sh/novaders-llp/livingdocs](https://polar.sh/novaders-llp/livingdocs)**.
 
 ---
 
@@ -216,7 +220,9 @@ frontend, user-service, admin-api, ...
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `ANTHROPIC_API_KEY` | Yes (for `query_docs` and `suggest_doc_update`) | Anthropic API key |
-| `LIVINGDOCS_LICENSE_KEY` | Yes (for Pro tools) | License key from Polar.sh |
+| `LIVINGDOCS_LICENSE_KEY` | Yes (for Pro tools) | License key from [polar.sh/novaders-llp/livingdocs](https://polar.sh/novaders-llp/livingdocs) |
+| `POLAR_ORGANIZATION_ID` | Yes (for live license validation) | Polar.sh organization UUID — find it in your Polar dashboard URL or Settings |
+| `POLAR_BENEFIT_ID` | No | Polar.sh benefit UUID for stricter per-benefit validation |
 | `GITHUB_TOKEN` | Yes (for `scan_org` with private repos) | GitHub personal access token with `repo` + `read:org` scopes |
 | `CONFLUENCE_BASE_URL` | Yes (for `sync_confluence`) | Confluence Cloud base URL |
 | `CONFLUENCE_EMAIL` | Yes (for `sync_confluence`) | Atlassian account email |

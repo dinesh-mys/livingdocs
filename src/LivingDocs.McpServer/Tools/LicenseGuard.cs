@@ -8,7 +8,7 @@ internal static class LicenseGuard
         if (status.IsValid) return null;
 
         return status.Plan == "free"
-            ? "This is a Pro feature. Get a license at https://polar.sh/dinesh-mys/livingdocs"
+            ? "This is a Pro feature. Get a license at https://polar.sh/novaders-llp/livingdocs"
             : $"License error: {status.Error}";
     }
 }
