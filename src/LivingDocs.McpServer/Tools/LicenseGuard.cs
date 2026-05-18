@@ -9,13 +9,14 @@ internal static class LicenseGuard
 
         return status.Plan == "free"
             ? """
-              ⚡ Pro feature — $10/month unlocks this.
+              ⚡ Pro feature — try free for 7 days, then $10/month.
 
               What you get with Pro:
-              • scan_org  — scan every repo in your GitHub org at once
+              • write_docs  — write Claude-generated docs to .md files with timestamps
+              • scan_org    — scan every repo in your GitHub org at once
               • sync_confluence — push updated docs to Confluence automatically
 
-              Activate in < 2 minutes: https://buy.polar.sh/polar_cl_LcRKdosjt3TwpUkKBSoDOPOP6ea6ArOfKpyB91MSdiM
+              Start free trial: https://buy.polar.sh/polar_cl_LcRKdosjt3TwpUkKBSoDOPOP6ea6ArOfKpyB91MSdiM
 
               Set LIVINGDOCS_LICENSE_KEY=<your-key> and you're done.
               """

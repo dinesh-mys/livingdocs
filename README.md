@@ -139,6 +139,8 @@ Open the Copilot chat panel, switch to **Agent mode**, and the `scan_repo`, `que
 
 ## Pro tier
 
+**7-day free trial available** — no credit card required to start.
+
 Pro tools require a license key and your Polar.sh organization ID:
 
 ```bash
@@ -166,7 +168,7 @@ Or add them to the `env` block in your config:
 
 `POLAR_ORGANIZATION_ID` is your org UUID from **Polar Dashboard → Settings**. `POLAR_ACCESS_TOKEN` is an org-level access token (Polar Dashboard → Settings → API Keys). Without these, the key is accepted based on format only — useful for local development.
 
-Get a license at **[buy.polar.sh — LivingDocs Pro](https://buy.polar.sh/polar_cl_LcRKdosjt3TwpUkKBSoDOPOP6ea6ArOfKpyB91MSdiM)**.
+Start a **[7-day free trial — LivingDocs Pro](https://buy.polar.sh/polar_cl_LcRKdosjt3TwpUkKBSoDOPOP6ea6ArOfKpyB91MSdiM)** (then $10/month).
 
 ---
 
