@@ -33,6 +33,7 @@ dotnet tool install -g LivingDocs.Mcp
 | `scan_repo` | Free | Scan a repo and list stale doc files with staleness % (0–100%) |
 | `query_docs` | Free | Answer natural-language questions about your codebase using its doc comments |
 | `suggest_doc_update` | Free | Ask Claude to rewrite a stale doc comment |
+| `write_docs` | Pro | Write updated docs to `docs/<File>.md` with a UTC timestamp — full audit trail of doc history |
 | `sync_confluence` | Pro | Write updated docs back to Confluence pages |
 | `scan_org` | Pro | Scan all repos in a GitHub org and return an org-wide report |
 
@@ -166,6 +167,34 @@ Or add them to the `env` block in your config:
 `POLAR_ORGANIZATION_ID` is your org UUID from **Polar Dashboard → Settings**. `POLAR_ACCESS_TOKEN` is an org-level access token (Polar Dashboard → Settings → API Keys). Without these, the key is accepted based on format only — useful for local development.
 
 Get a license at **[buy.polar.sh — LivingDocs Pro](https://buy.polar.sh/polar_cl_LcRKdosjt3TwpUkKBSoDOPOP6ea6ArOfKpyB91MSdiM)**.
+
+---
+
+## Pro tool — write_docs
+
+Detects stale doc comments in a file, generates updated documentation via Claude, and appends the results to `docs/<FileName>.md` inside your repository — with a UTC timestamp on every run. Each run adds a new dated section, building a full audit trail of how your documentation evolved over time.
+
+**Usage in Claude:**
+```
+write_docs on /path/to/repo for src/Tax.cs
+```
+
+Creates or appends to `docs/Tax.md`:
+```markdown
+# Tax.cs — LivingDocs Documentation
+
+<!-- LivingDocs update: 2026-05-19 10:32 UTC | src/Tax.cs -->
+## 2026-05-19
+
+### TaxCalculator.Calculate
+Calculates net tax payable given gross income, deductions, and the current financial year slab rates...
+
+*Confidence: 92%*
+
+---
+```
+
+No external credentials needed — just `LIVINGDOCS_LICENSE_KEY` and `ANTHROPIC_API_KEY`.
 
 ---
 

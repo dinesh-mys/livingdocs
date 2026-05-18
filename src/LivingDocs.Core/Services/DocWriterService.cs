@@ -1,3 +1,4 @@
+using System.Text;
 using LivingDocs.Core.Interfaces;
 using LivingDocs.Core.Models;
 
@@ -6,6 +7,48 @@ namespace LivingDocs.Core.Services;
 /// <summary>Patches a doc comment block in a source file on disk. Detects the comment style and indentation from the original block, formats the suggestion in the same style, and splices the replacement lines into the file.</summary>
 public class DocWriterService : IDocWriterService
 {
+    public async Task<string> WriteDocsAsync(
+        string repoPath,
+        string filePath,
+        IReadOnlyList<(string Symbol, string Suggestion, float Confidence)> entries)
+    {
+        var docsDir = Path.Combine(repoPath, "docs");
+        Directory.CreateDirectory(docsDir);
+
+        var mdFileName = Path.GetFileNameWithoutExtension(filePath) + ".md";
+        var mdPath     = Path.Combine(docsDir, mdFileName);
+        var timestamp  = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm UTC");
+
+        var sb = new StringBuilder();
+
+        if (!File.Exists(mdPath))
+        {
+            sb.AppendLine($"# {Path.GetFileName(filePath)} — LivingDocs Documentation");
+            sb.AppendLine();
+        }
+
+        sb.AppendLine($"<!-- LivingDocs update: {timestamp} | {filePath} -->");
+        sb.AppendLine($"## {DateTime.UtcNow:yyyy-MM-dd}");
+        sb.AppendLine();
+
+        foreach (var (symbol, suggestion, confidence) in entries)
+        {
+            sb.AppendLine($"### {symbol}");
+            sb.AppendLine();
+            sb.AppendLine(suggestion.Trim());
+            sb.AppendLine();
+            sb.AppendLine($"*Confidence: {confidence:P0}*");
+            sb.AppendLine();
+        }
+
+        sb.AppendLine("---");
+        sb.AppendLine();
+
+        await File.AppendAllTextAsync(mdPath, sb.ToString());
+
+        return Path.GetRelativePath(repoPath, mdPath);
+    }
+
     public async Task<int> WriteBackAsync(
         string repoPath, string filePath, DocChunk chunk, string newCommentText)
     {

@@ -115,6 +115,90 @@ public static class ProTools
         }
     }
 
+    [McpServerTool(Name = "write_docs")]
+    [Description(
+        "PRO — Detect stale doc comments in a file, generate updated documentation via Claude, " +
+        "and append the results with a UTC timestamp to docs/<FileName>.md inside the repository. " +
+        "Each run appends a new dated section so you get a full audit trail of doc history. " +
+        "Requires LIVINGDOCS_LICENSE_KEY and ANTHROPIC_API_KEY to be set.")]
+    public static async Task<string> WriteDocs(
+        ILicenseService          license,
+        IStaleDocDetectorService detector,
+        IDocExtractorService     extractor,
+        IGitScannerService       scanner,
+        IClaudeService           claude,
+        IDocWriterService        writer,
+        [Description("Absolute path to the git repository")] string repoPath,
+        [Description("File path relative to the repository root, e.g. src/Tax.cs")] string filePath)
+    {
+        var licenseError = await LicenseGuard.RequireProAsync(license);
+        if (licenseError is not null) return licenseError;
+
+        var fullPath = Path.Combine(repoPath, filePath);
+        if (!File.Exists(fullPath))
+            return $"Error: file not found: {fullPath}";
+
+        // ── 1. Extract doc chunks ─────────────────────────────────────────────
+        var content = await File.ReadAllTextAsync(fullPath);
+        var chunks  = (await extractor.ExtractAsync(filePath, content)).ToList();
+
+        if (chunks.Count == 0)
+            return $"No documentation comments found in {filePath}.";
+
+        // ── 2. Get latest git change for the file ─────────────────────────────
+        var changes = (await scanner.ScanAsync(repoPath))
+            .Where(c => string.Equals(c.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(c => c.Timestamp)
+            .ToList();
+
+        if (changes.Count == 0)
+            return $"No recent git changes found for '{filePath}'. Has this file been committed?";
+
+        var latestChange = changes[0];
+
+        // ── 3. Generate Claude suggestions for each chunk ─────────────────────
+        var entries  = new List<(string Symbol, string Suggestion, float Confidence)>();
+        var skipped  = new List<string>();
+
+        foreach (var chunk in chunks)
+        {
+            var symbolContext = chunk.ParentSymbol is not null
+                ? await scanner.GetSymbolContextAsync(repoPath, filePath, chunk.ParentSymbol)
+                : null;
+
+            var suggestion = await claude.SuggestDocUpdateAsync(latestChange, chunk, symbolContext);
+
+            if (suggestion.NeedsReview)
+            {
+                skipped.Add($"• {chunk.ParentSymbol ?? "unknown"} (confidence {suggestion.Confidence:P0})");
+                continue;
+            }
+
+            entries.Add((chunk.ParentSymbol ?? "unknown", suggestion.Suggestion, suggestion.Confidence));
+        }
+
+        if (entries.Count == 0)
+            return $"All suggestions were low-confidence for '{filePath}'. Run `suggest_doc_update` to review manually.";
+
+        // ── 4. Append to docs/<File>.md ───────────────────────────────────────
+        var mdRelPath = await writer.WriteDocsAsync(repoPath, filePath, entries);
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"✅ Wrote {entries.Count} doc section(s) to `{mdRelPath}`");
+        sb.AppendLine();
+        foreach (var (symbol, _, confidence) in entries)
+            sb.AppendLine($"  • {symbol} ({confidence:P0})");
+
+        if (skipped.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"⚠️ Skipped {skipped.Count} low-confidence section(s) — review with `suggest_doc_update`:");
+            skipped.ForEach(l => sb.AppendLine(l));
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
     [McpServerTool(Name = "scan_org")]
     [Description(
         "PRO — Scan every repository in a GitHub organisation and return an org-wide staleness " +
