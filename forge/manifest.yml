@@ -1,0 +1,31 @@
+modules:
+  confluence:contentBylineItem:
+    - key: livingdocs-byline
+      resource: main
+      render: native
+      resolver:
+        function: resolver
+      title: LivingDocs
+      viewportSize: medium
+
+  function:
+    - key: resolver
+      handler: resolvers/index.handler
+
+resources:
+  - key: main
+    path: src/index.jsx
+
+app:
+  id: ari:cloud:ecosystem::app/9aa8a8fb-b2e2-40fc-9c79-f30e8afcd74e
+  runtime:
+    name: nodejs22.x
+
+permissions:
+  scopes:
+    - read:confluence-content.all
+    - storage:app
+  external:
+    fetch:
+      backend:
+        - address: https://api.github.com
