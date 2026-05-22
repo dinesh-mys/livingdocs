@@ -10,7 +10,7 @@ public static class GitHubWebhookHandler
 {
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
-    public static async Task<IResult> HandleAsync(HttpContext ctx, IStaleDocDetectorService detector)
+    public static async Task<IResult> HandleAsync(HttpContext ctx, IStaleDocDetectorService detector, IClaudeService claude)
     {
         // Read raw body first — needed for HMAC validation before parsing.
         using var ms   = new MemoryStream();
@@ -56,9 +56,18 @@ public static class GitHubWebhookHandler
         if (changedFiles.Count == 0)
             return Results.Ok("no supported files changed");
 
+        // Fetch diff and run AI impact analysis in parallel with staleness scan.
+        var diffTask     = GetPrDiffAsync(http, repoOwner, repoName, prNumber);
         var (report, staleDocs) = await BuildReportAsync(detector, repoPath, changedFiles, repoOwner, repoName);
-        await PostPrCommentAsync(http, repoOwner, repoName, prNumber, report);
-        await SlackNotifier.NotifyStaleDocsAsync(prUrl, prTitle, prNumber, $"{repoOwner}/{repoName}", staleDocs);
+
+        var rawDiff    = await diffTask;
+        var impactSummary = rawDiff.Length > 0
+            ? await claude.AnalysePrDiffAsync(rawDiff)
+            : string.Empty;
+
+        var fullReport = BuildFullReport(impactSummary, report);
+        await PostPrCommentAsync(http, repoOwner, repoName, prNumber, fullReport);
+        await SlackNotifier.NotifyStaleDocsAsync(prUrl, prTitle, prNumber, $"{repoOwner}/{repoName}", staleDocs, impactSummary);
 
         return Results.Ok("comment posted");
     }
@@ -118,6 +127,38 @@ public static class GitHubWebhookHandler
             return result;
         }
         catch { return []; }
+    }
+
+    // ── PR diff fetch ─────────────────────────────────────────────────────
+
+    private static async Task<string> GetPrDiffAsync(
+        HttpClient http, string owner, string repo, int prNumber)
+    {
+        try
+        {
+            var url    = $"https://api.github.com/repos/{owner}/{repo}/pulls/{prNumber}";
+            var req    = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.Add("Accept", "application/vnd.github.diff");
+            var resp   = await http.SendAsync(req);
+            return resp.IsSuccessStatusCode ? await resp.Content.ReadAsStringAsync() : string.Empty;
+        }
+        catch { return string.Empty; }
+    }
+
+    private static string BuildFullReport(string impactSummary, string staleReport)
+    {
+        if (string.IsNullOrWhiteSpace(impactSummary))
+            return staleReport;
+
+        var sb = new StringBuilder();
+        sb.AppendLine("## 🤖 What changed");
+        sb.AppendLine();
+        sb.AppendLine(impactSummary.Trim());
+        sb.AppendLine();
+        sb.AppendLine("---");
+        sb.AppendLine();
+        sb.Append(staleReport);
+        return sb.ToString();
     }
 
     // ── Stale detection + report ──────────────────────────────────────────

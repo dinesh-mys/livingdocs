@@ -53,4 +53,5 @@ file sealed class NullClaudeService : IClaudeService
     public Task<DocSuggestion> SuggestDocUpdateAsync(ChangeEvent change, DocChunk existingDoc, string? symbolContext = null)
         => Task.FromResult(new DocSuggestion(Msg, 0f, NeedsReview: true));
     public Task<string> QueryDocsAsync(string question, IEnumerable<DocChunk> docs) => Task.FromResult(Msg);
+    public Task<string> AnalysePrDiffAsync(string diff) => Task.FromResult(Msg);
 }

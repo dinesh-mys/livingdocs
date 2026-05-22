@@ -185,6 +185,31 @@ public class ClaudeService : IClaudeService
         return (raw.TrimEnd(), 0.5f);
     }
 
+    public async Task<string> AnalysePrDiffAsync(string diff)
+    {
+        // Truncate very large diffs — enough context for Claude without blowing token budget.
+        const int MaxDiffChars = 6000;
+        var truncated = diff.Length > MaxDiffChars
+            ? diff[..MaxDiffChars] + "\n... [diff truncated]"
+            : diff;
+
+        var prompt = $"""
+            You are a senior engineer reviewing a pull request diff.
+            In 2-3 concise sentences of plain English explain:
+            1. What business logic or behaviour changed?
+            2. Any user-facing or API impact?
+            3. Is this a breaking change, a new feature, or an internal refactor?
+
+            Be specific — name the components, endpoints, or flows that changed.
+            Do not describe changes line-by-line. Write for a non-technical stakeholder.
+
+            PULL REQUEST DIFF:
+            {truncated}
+            """;
+
+        return await CompleteAsync(prompt, maxTokens: 200);
+    }
+
     public async Task<string> QueryDocsAsync(string question, IEnumerable<DocChunk> docs)
     {
         var context = new System.Text.StringBuilder();

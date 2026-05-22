@@ -13,13 +13,14 @@ public static class SlackNotifier
         string prTitle,
         int prNumber,
         string repoFullName,
-        IReadOnlyList<StaleDoc> staleDocs)
+        IReadOnlyList<StaleDoc> staleDocs,
+        string impactSummary = "")
     {
         var webhookUrl = Environment.GetEnvironmentVariable("SLACK_WEBHOOK_URL");
         if (string.IsNullOrWhiteSpace(webhookUrl)) return;
         if (staleDocs.Count == 0) return;
 
-        var payload = BuildPayload(prUrl, prTitle, prNumber, repoFullName, staleDocs);
+        var payload = BuildPayload(prUrl, prTitle, prNumber, repoFullName, staleDocs, impactSummary);
         try
         {
             using var http    = new HttpClient();
@@ -34,7 +35,8 @@ public static class SlackNotifier
         string prTitle,
         int prNumber,
         string repoFullName,
-        IReadOnlyList<StaleDoc> staleDocs)
+        IReadOnlyList<StaleDoc> staleDocs,
+        string impactSummary)
     {
         var fileList = new StringBuilder();
         foreach (var doc in staleDocs.Take(8))
@@ -45,7 +47,7 @@ public static class SlackNotifier
         if (staleDocs.Count > 8)
             fileList.AppendLine($"_...and {staleDocs.Count - 8} more_");
 
-        var blocks = new object[]
+        var blockList = new List<object>
         {
             new
             {
@@ -61,35 +63,49 @@ public static class SlackNotifier
                     text = $"*<{prUrl}|PR #{prNumber}: {EscapeSlack(prTitle)}>* merged in `{repoFullName}`\n" +
                            $"*{staleDocs.Count}* file(s) changed in this PR may have outdated documentation."
                 }
-            },
-            new
-            {
-                type = "section",
-                text = new { type = "mrkdwn", text = fileList.ToString().TrimEnd() }
-            },
-            new
-            {
-                type = "actions",
-                elements = new object[]
-                {
-                    new
-                    {
-                        type = "button",
-                        text = new { type = "plain_text", text = "View PR", emoji = true },
-                        url  = prUrl,
-                        style = "primary"
-                    }
-                }
-            },
-            new
-            {
-                type = "context",
-                elements = new object[]
-                {
-                    new { type = "mrkdwn", text = "Run `suggest_doc_update` in Claude to auto-draft fixes · _LivingDocs_" }
-                }
             }
         };
+
+        if (!string.IsNullOrWhiteSpace(impactSummary))
+        {
+            blockList.Add(new
+            {
+                type = "section",
+                text = new { type = "mrkdwn", text = $"*What changed:* {EscapeSlack(impactSummary.Trim())}" }
+            });
+        }
+
+        blockList.Add(new
+        {
+            type = "section",
+            text = new { type = "mrkdwn", text = fileList.ToString().TrimEnd() }
+        });
+
+        blockList.Add(new
+        {
+            type = "actions",
+            elements = new object[]
+            {
+                new
+                {
+                    type = "button",
+                    text = new { type = "plain_text", text = "View PR", emoji = true },
+                    url  = prUrl,
+                    style = "primary"
+                }
+            }
+        });
+
+        blockList.Add(new
+        {
+            type = "context",
+            elements = new object[]
+            {
+                new { type = "mrkdwn", text = "Run `suggest_doc_update` in Claude to auto-draft fixes · _LivingDocs_" }
+            }
+        });
+
+        var blocks = blockList.ToArray();
 
         return JsonSerializer.Serialize(new { blocks });
     }

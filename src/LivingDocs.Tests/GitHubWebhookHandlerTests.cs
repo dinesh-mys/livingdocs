@@ -36,11 +36,21 @@ public class GitHubWebhookHandlerTests : IDisposable
     }
 
     private static readonly IStaleDocDetectorService StubDetector = new NullDetector();
+    private static readonly IClaudeService StubClaude = new NullClaudeStub();
 
     private sealed class NullDetector : IStaleDocDetectorService
     {
         public Task<ScanResult> DetectAsync(string repoPath) =>
             Task.FromResult(new ScanResult { RepoPath = repoPath });
+    }
+
+    private sealed class NullClaudeStub : IClaudeService
+    {
+        public Task<string> CompleteAsync(string prompt, int maxTokens = 1024, string? model = null) => Task.FromResult(string.Empty);
+        public Task<DocSuggestion> SuggestDocUpdateAsync(ChangeEvent change, DocChunk existingDoc, string? symbolContext = null)
+            => Task.FromResult(new DocSuggestion(string.Empty, 0f, NeedsReview: false));
+        public Task<string> QueryDocsAsync(string question, IEnumerable<DocChunk> docs) => Task.FromResult(string.Empty);
+        public Task<string> AnalysePrDiffAsync(string diff) => Task.FromResult(string.Empty);
     }
 
     // ── Signature validation ──────────────────────────────────────────────────
@@ -49,7 +59,7 @@ public class GitHubWebhookHandlerTests : IDisposable
     public async Task HandleAsync_MissingSignature_Returns401()
     {
         var ctx = BuildContext("{}", "ping", signature: "");
-        var result = await GitHubWebhookHandler.HandleAsync(ctx, StubDetector);
+        var result = await GitHubWebhookHandler.HandleAsync(ctx, StubDetector, StubClaude);
         Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.UnauthorizedHttpResult>(result);
     }
 
@@ -57,7 +67,7 @@ public class GitHubWebhookHandlerTests : IDisposable
     public async Task HandleAsync_WrongSignature_Returns401()
     {
         var ctx = BuildContext("{}", "ping", signature: "sha256=deadbeef");
-        var result = await GitHubWebhookHandler.HandleAsync(ctx, StubDetector);
+        var result = await GitHubWebhookHandler.HandleAsync(ctx, StubDetector, StubClaude);
         Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.UnauthorizedHttpResult>(result);
     }
 
@@ -65,7 +75,7 @@ public class GitHubWebhookHandlerTests : IDisposable
     public async Task HandleAsync_ValidSignature_DoesNotReturn401()
     {
         var ctx    = BuildContext("{}", "ping");
-        var result = await GitHubWebhookHandler.HandleAsync(ctx, StubDetector);
+        var result = await GitHubWebhookHandler.HandleAsync(ctx, StubDetector, StubClaude);
         Assert.IsNotType<Microsoft.AspNetCore.Http.HttpResults.UnauthorizedHttpResult>(result);
     }
 
@@ -75,7 +85,7 @@ public class GitHubWebhookHandlerTests : IDisposable
     public async Task HandleAsync_PingEvent_ReturnsIgnored()
     {
         var ctx    = BuildContext("{}", "ping");
-        var result = await GitHubWebhookHandler.HandleAsync(ctx, StubDetector);
+        var result = await GitHubWebhookHandler.HandleAsync(ctx, StubDetector, StubClaude);
         var ok     = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<string>>(result);
         Assert.Equal("event ignored", ok.Value);
     }
@@ -84,7 +94,7 @@ public class GitHubWebhookHandlerTests : IDisposable
     public async Task HandleAsync_PushEvent_ReturnsIgnored()
     {
         var ctx    = BuildContext("{}", "push");
-        var result = await GitHubWebhookHandler.HandleAsync(ctx, StubDetector);
+        var result = await GitHubWebhookHandler.HandleAsync(ctx, StubDetector, StubClaude);
         var ok     = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<string>>(result);
         Assert.Equal("event ignored", ok.Value);
     }
@@ -100,7 +110,7 @@ public class GitHubWebhookHandlerTests : IDisposable
             }
             """;
         var ctx    = BuildContext(json, "pull_request");
-        var result = await GitHubWebhookHandler.HandleAsync(ctx, StubDetector);
+        var result = await GitHubWebhookHandler.HandleAsync(ctx, StubDetector, StubClaude);
         var ok     = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<string>>(result);
         Assert.Equal("event ignored", ok.Value);
     }
@@ -116,7 +126,7 @@ public class GitHubWebhookHandlerTests : IDisposable
             }
             """;
         var ctx    = BuildContext(json, "pull_request");
-        var result = await GitHubWebhookHandler.HandleAsync(ctx, StubDetector);
+        var result = await GitHubWebhookHandler.HandleAsync(ctx, StubDetector, StubClaude);
         var ok     = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<string>>(result);
         Assert.Equal("event ignored", ok.Value);
     }
@@ -134,7 +144,7 @@ public class GitHubWebhookHandlerTests : IDisposable
             }
             """;
         var ctx    = BuildContext(json, "pull_request");
-        var result = await GitHubWebhookHandler.HandleAsync(ctx, StubDetector);
+        var result = await GitHubWebhookHandler.HandleAsync(ctx, StubDetector, StubClaude);
         var ok     = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<string>>(result);
         Assert.Contains("LIVINGDOCS_REPO_PATH", ok.Value);
     }
