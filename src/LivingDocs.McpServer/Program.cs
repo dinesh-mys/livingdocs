@@ -71,7 +71,10 @@ builder.Services
     .AddSingleton<IIndexService, IndexService>()
     .AddSingleton<IDocWriterService, DocWriterService>()
     .AddSingleton<IGapDetectorService, GapDetectorService>()
-    .AddSingleton<IDepartureRiskService, DepartureRiskService>();
+    .AddSingleton<IDepartureRiskService, DepartureRiskService>()
+    .AddSingleton<ISlackConnectorService>(_ => new SlackConnectorService(new HttpClient()))
+    .AddSingleton<ITeamsConnectorService>(_ => new TeamsConnectorService(new HttpClient()))
+    .AddSingleton<IEmailConnectorService, EmailConnectorService>();
 
 builder.Services
     .AddMcpServer()
