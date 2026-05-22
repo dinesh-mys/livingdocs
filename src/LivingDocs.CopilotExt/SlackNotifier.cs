@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using LivingDocs.Core.Models;
 
 /// <summary>
@@ -15,13 +16,14 @@ public static class SlackNotifier
         string repoFullName,
         IReadOnlyList<StaleDoc> staleDocs,
         string impactSummary = "",
-        IReadOnlyList<AffectedDoc>? affectedDocs = null)
+        IReadOnlyList<AffectedDoc>? affectedDocs = null,
+        string? repoPath = null)
     {
         var webhookUrl = Environment.GetEnvironmentVariable("SLACK_WEBHOOK_URL");
         if (string.IsNullOrWhiteSpace(webhookUrl)) return;
         if (staleDocs.Count == 0) return;
 
-        var payload = BuildPayload(prUrl, prTitle, prNumber, repoFullName, staleDocs, impactSummary, affectedDocs ?? []);
+        var payload = BuildPayload(prUrl, prTitle, prNumber, repoFullName, staleDocs, impactSummary, affectedDocs ?? [], repoPath);
         try
         {
             using var http    = new HttpClient();
@@ -38,7 +40,8 @@ public static class SlackNotifier
         string repoFullName,
         IReadOnlyList<StaleDoc> staleDocs,
         string impactSummary,
-        IReadOnlyList<AffectedDoc> affectedDocs)
+        IReadOnlyList<AffectedDoc> affectedDocs,
+        string? repoPath)
     {
         var fileList = new StringBuilder();
         foreach (var doc in staleDocs.Take(8))
@@ -96,20 +99,32 @@ public static class SlackNotifier
             text = new { type = "mrkdwn", text = fileList.ToString().TrimEnd() }
         });
 
-        blockList.Add(new
+        var actionElements = new List<object>
         {
-            type = "actions",
-            elements = new object[]
+            new
             {
-                new
-                {
-                    type = "button",
-                    text = new { type = "plain_text", text = "View PR", emoji = true },
-                    url  = prUrl,
-                    style = "primary"
-                }
+                type  = "button",
+                text  = new { type = "plain_text", text = "View PR", emoji = true },
+                url   = prUrl,
+                style = "primary"
             }
-        });
+        };
+
+        // Add "Auto-draft" button when repoPath is known and there's a stale file to fix
+        if (!string.IsNullOrWhiteSpace(repoPath) && staleDocs.Count > 0)
+        {
+            var topFile = staleDocs.OrderByDescending(d => d.StaleScore).First();
+            var actionValue = JsonSerializer.Serialize(new AutoDraftAction(repoPath, topFile.FilePath, prNumber));
+            actionElements.Add(new
+            {
+                type      = "button",
+                text      = new { type = "plain_text", text = "Auto-draft top doc", emoji = true },
+                action_id = "autodraft_doc",
+                value     = actionValue
+            });
+        }
+
+        blockList.Add(new { type = "actions", elements = actionElements.ToArray() });
 
         blockList.Add(new
         {
@@ -128,3 +143,8 @@ public static class SlackNotifier
     private static string EscapeSlack(string text) =>
         text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
 }
+
+public record AutoDraftAction(
+    [property: JsonPropertyName("repoPath")]  string RepoPath,
+    [property: JsonPropertyName("filePath")]  string FilePath,
+    [property: JsonPropertyName("prNumber")] int PrNumber);

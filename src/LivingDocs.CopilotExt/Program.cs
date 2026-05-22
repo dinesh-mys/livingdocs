@@ -16,13 +16,16 @@ builder.Services
     .AddSingleton<IDocExtractorService, DocExtractorService>()
     .AddSingleton<IGitScannerService, GitScannerService>()
     .AddSingleton<IStaleDocDetectorService, StaleDocDetectorService>()
-    .AddSingleton<ISemanticSearchServiceFactory, ClaudeAssistedSearchFactory>();
+    .AddSingleton<ISemanticSearchServiceFactory, ClaudeAssistedSearchFactory>()
+    .AddSingleton<IGapDetectorService, GapDetectorService>()
+    .AddSingleton<IDepartureRiskService, DepartureRiskService>();
 
 var app = builder.Build();
 
 app.MapGet("/health", () => Results.Ok("ok"));
 app.MapPost("/api/copilot/chat", CopilotChatEndpoint.HandleAsync);
 app.MapPost("/api/github/webhook", GitHubWebhookHandler.HandleAsync);
+app.MapPost("/api/slack/actions", SlackActionsHandler.HandleAsync);
 
 app.Run();
 

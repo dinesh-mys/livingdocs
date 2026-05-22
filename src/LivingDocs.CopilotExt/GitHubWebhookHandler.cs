@@ -73,7 +73,7 @@ public static class GitHubWebhookHandler
 
         var fullReport = BuildFullReport(impactSummary, affectedDocs, report);
         await PostPrCommentAsync(http, repoOwner, repoName, prNumber, fullReport);
-        await SlackNotifier.NotifyStaleDocsAsync(prUrl, prTitle, prNumber, $"{repoOwner}/{repoName}", staleDocs, impactSummary, affectedDocs);
+        await SlackNotifier.NotifyStaleDocsAsync(prUrl, prTitle, prNumber, $"{repoOwner}/{repoName}", staleDocs, impactSummary, affectedDocs, repoPath);
 
         return Results.Ok("comment posted");
     }
