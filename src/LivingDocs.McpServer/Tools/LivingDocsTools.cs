@@ -181,6 +181,59 @@ public static class LivingDocsTools
         return sb.ToString().TrimEnd();
     }
 
+    [McpServerTool(Name = "detect_gaps", ReadOnly = true)]
+    [Description(
+        "Find source files that have NO documentation comments (XML ///, JSDoc, or docstrings). " +
+        "Results are ranked by commit activity so the busiest undocumented files appear first — " +
+        "these are the highest-priority knowledge gaps. " +
+        "Skips test files, build output folders, and node_modules.")]
+    public static async Task<string> DetectGaps(
+        IGapDetectorService gapDetector,
+        [Description("Absolute path to the local git repository")] string repoPath)
+    {
+        if (!Directory.Exists(repoPath))
+            return $"Error: directory not found — {repoPath}";
+
+        var report = await gapDetector.DetectAsync(repoPath);
+
+        var undocumented = report.TotalFiles - report.DocumentedFiles;
+        var pct = report.TotalFiles > 0
+            ? (double)undocumented / report.TotalFiles * 100
+            : 0;
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"Knowledge gaps in '{repoPath}'");
+        sb.AppendLine($"Files scanned: {report.TotalFiles}  |  Documented: {report.DocumentedFiles}  |  Undocumented: {undocumented} ({pct:F0}%)");
+
+        if (report.Gaps.Count == 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("No knowledge gaps found — every file has documentation.");
+            return sb.ToString().TrimEnd();
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("Top undocumented files by activity:");
+        sb.AppendLine();
+
+        foreach (var gap in report.Gaps.Take(20))
+        {
+            var date   = gap.LastChanged == DateTime.MinValue ? "unknown" : gap.LastChanged.ToString("yyyy-MM-dd");
+            var author = string.IsNullOrEmpty(gap.LastAuthor) ? "" : $"  by {gap.LastAuthor}";
+            var commits = gap.CommitCount > 0 ? $"{gap.CommitCount} commit{(gap.CommitCount == 1 ? "" : "s")}" : "no history";
+            sb.AppendLine($"  {gap.FilePath,-55} {commits,-12}  last changed {date}{author}");
+        }
+
+        if (report.Gaps.Count > 20)
+            sb.AppendLine($"  ... and {report.Gaps.Count - 20} more");
+
+        sb.AppendLine();
+        sb.AppendLine("To add docs to the highest-priority file, run:");
+        sb.AppendLine($"  suggest_doc_update on {repoPath} {report.Gaps[0].FilePath}");
+
+        return sb.ToString().TrimEnd();
+    }
+
     [McpServerTool(Name = "write_back")]
     [Description(
         "Generate an updated doc comment for every symbol in a file and write it directly " +

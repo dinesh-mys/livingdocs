@@ -69,7 +69,8 @@ builder.Services
     .AddSingleton<IGitHubOrgService>(_ => new GitHubOrgService(new HttpClient()))
     .AddSingleton<ISemanticSearchServiceFactory, ClaudeAssistedSearchFactory>()
     .AddSingleton<IIndexService, IndexService>()
-    .AddSingleton<IDocWriterService, DocWriterService>();
+    .AddSingleton<IDocWriterService, DocWriterService>()
+    .AddSingleton<IGapDetectorService, GapDetectorService>();
 
 builder.Services
     .AddMcpServer()
@@ -459,4 +460,7 @@ file sealed class NullClaudeService : IClaudeService
     public Task<DocSuggestion> SuggestDocUpdateAsync(ChangeEvent change, DocChunk existingDoc, string? symbolContext = null)
         => Task.FromResult(new DocSuggestion(Msg, 0f, NeedsReview: true));
     public Task<string> QueryDocsAsync(string question, IEnumerable<DocChunk> docs) => Task.FromResult(Msg);
+    public Task<string> AnalysePrDiffAsync(string diff) => Task.FromResult(Msg);
+    public Task<IReadOnlyList<AffectedDoc>> FindAffectedDocsAsync(string impactSummary, IEnumerable<string> changedFiles, IEnumerable<DocCandidate> candidates)
+        => Task.FromResult<IReadOnlyList<AffectedDoc>>([]);
 }
