@@ -70,7 +70,8 @@ builder.Services
     .AddSingleton<ISemanticSearchServiceFactory, ClaudeAssistedSearchFactory>()
     .AddSingleton<IIndexService, IndexService>()
     .AddSingleton<IDocWriterService, DocWriterService>()
-    .AddSingleton<IGapDetectorService, GapDetectorService>();
+    .AddSingleton<IGapDetectorService, GapDetectorService>()
+    .AddSingleton<IDepartureRiskService, DepartureRiskService>();
 
 builder.Services
     .AddMcpServer()

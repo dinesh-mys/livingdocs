@@ -234,6 +234,57 @@ public static class LivingDocsTools
         return sb.ToString().TrimEnd();
     }
 
+    [McpServerTool(Name = "departure_risk", ReadOnly = true)]
+    [Description(
+        "Identify authors who are the sole or dominant contributor to critical source files — " +
+        "the 'bus factor 1' problem. Files where one person accounts for ≥60% of commits AND " +
+        "has at least 5 commits are flagged as single points of knowledge. " +
+        "Results group by author so you can see at a glance who holds the most undocumented knowledge. " +
+        "Run detect_gaps afterwards to find which of these files also lack documentation.")]
+    public static async Task<string> DepartureRisk(
+        IDepartureRiskService riskService,
+        [Description("Absolute path to the local git repository")] string repoPath)
+    {
+        if (!Directory.Exists(repoPath))
+            return $"Error: directory not found — {repoPath}";
+
+        var report = await riskService.AnalyseAsync(repoPath);
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"Departure risk analysis for '{repoPath}'");
+        sb.AppendLine($"Files analysed: {report.FilesAnalysed}  |  High-risk files: {report.RiskyFiles.Count}");
+
+        if (report.RiskyFiles.Count == 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("No single points of knowledge found.");
+            return sb.ToString().TrimEnd();
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("Authors with exclusive knowledge:");
+        sb.AppendLine();
+
+        foreach (var author in report.AuthorSummaries)
+        {
+            sb.AppendLine($"  {author.Author}  ({author.OwnedFiles.Count} file{(author.OwnedFiles.Count == 1 ? "" : "s")})");
+            foreach (var filePath in author.OwnedFiles.Take(10))
+            {
+                var risk = report.RiskyFiles.First(f => f.FilePath == filePath);
+                var top  = risk.TopAuthors[0];
+                sb.AppendLine($"    • {filePath,-55} {risk.TotalCommits} commits  ({top.Percentage:P0} by {top.Author})");
+            }
+            if (author.OwnedFiles.Count > 10)
+                sb.AppendLine($"    ... and {author.OwnedFiles.Count - 10} more");
+            sb.AppendLine();
+        }
+
+        sb.AppendLine("To generate a handover doc for the riskiest file:");
+        sb.AppendLine($"  suggest_doc_update on {repoPath} {report.RiskyFiles[0].FilePath}");
+
+        return sb.ToString().TrimEnd();
+    }
+
     [McpServerTool(Name = "write_back")]
     [Description(
         "Generate an updated doc comment for every symbol in a file and write it directly " +
