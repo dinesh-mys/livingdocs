@@ -139,3 +139,31 @@ public class GitHubWebhookHandlerTests : IDisposable
         Assert.Contains("LIVINGDOCS_REPO_PATH", ok.Value);
     }
 }
+
+public class SlackNotifierTests
+{
+    [Fact]
+    public async Task NotifyStaleDocsAsync_NoWebhookUrl_DoesNotThrow()
+    {
+        Environment.SetEnvironmentVariable("SLACK_WEBHOOK_URL", null);
+        var staleDocs = new List<StaleDoc>
+        {
+            new() { FilePath = "src/Auth.cs", StaleScore = 0.85f,
+                    DocLastUpdated = DateTime.UtcNow.AddMonths(-6),
+                    CodeLastChanged = DateTime.UtcNow.AddDays(-2) }
+        };
+        // Should not throw even with no webhook URL configured
+        await SlackNotifier.NotifyStaleDocsAsync(
+            "https://github.com/org/repo/pull/1", "Add auth flow", 1, "org/repo", staleDocs);
+    }
+
+    [Fact]
+    public async Task NotifyStaleDocsAsync_EmptyStaleDocs_DoesNotThrow()
+    {
+        Environment.SetEnvironmentVariable("SLACK_WEBHOOK_URL", "https://hooks.slack.com/test");
+        // Should no-op silently when there are no stale docs
+        await SlackNotifier.NotifyStaleDocsAsync(
+            "https://github.com/org/repo/pull/2", "Chore: tidy up", 2, "org/repo", []);
+        Environment.SetEnvironmentVariable("SLACK_WEBHOOK_URL", null);
+    }
+}
