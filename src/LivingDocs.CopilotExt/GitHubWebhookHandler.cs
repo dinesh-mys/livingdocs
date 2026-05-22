@@ -60,14 +60,20 @@ public static class GitHubWebhookHandler
         var diffTask     = GetPrDiffAsync(http, repoOwner, repoName, prNumber);
         var (report, staleDocs) = await BuildReportAsync(detector, repoPath, changedFiles, repoOwner, repoName);
 
-        var rawDiff    = await diffTask;
+        var rawDiff       = await diffTask;
         var impactSummary = rawDiff.Length > 0
             ? await claude.AnalysePrDiffAsync(rawDiff)
             : string.Empty;
 
-        var fullReport = BuildFullReport(impactSummary, report);
+        // Semantic doc mapping — find .md docs related to this change
+        var mdCandidates = ScanMarkdownDocs(repoPath);
+        var affectedDocs = mdCandidates.Count > 0 && impactSummary.Length > 0
+            ? await claude.FindAffectedDocsAsync(impactSummary, changedFiles, mdCandidates)
+            : (IReadOnlyList<AffectedDoc>)[];
+
+        var fullReport = BuildFullReport(impactSummary, affectedDocs, report);
         await PostPrCommentAsync(http, repoOwner, repoName, prNumber, fullReport);
-        await SlackNotifier.NotifyStaleDocsAsync(prUrl, prTitle, prNumber, $"{repoOwner}/{repoName}", staleDocs, impactSummary);
+        await SlackNotifier.NotifyStaleDocsAsync(prUrl, prTitle, prNumber, $"{repoOwner}/{repoName}", staleDocs, impactSummary, affectedDocs);
 
         return Results.Ok("comment posted");
     }
@@ -145,18 +151,63 @@ public static class GitHubWebhookHandler
         catch { return string.Empty; }
     }
 
-    private static string BuildFullReport(string impactSummary, string staleReport)
+    private static IReadOnlyList<DocCandidate> ScanMarkdownDocs(string repoPath)
     {
-        if (string.IsNullOrWhiteSpace(impactSummary))
-            return staleReport;
+        var skipDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "node_modules", ".git", "bin", "obj", ".livingdocs" };
 
+        try
+        {
+            return Directory
+                .EnumerateFiles(repoPath, "*.md", SearchOption.AllDirectories)
+                .Where(f => !f.Split(Path.DirectorySeparatorChar)
+                              .Any(seg => skipDirs.Contains(seg)))
+                .Take(30) // cap candidates to keep prompt size reasonable
+                .Select(f =>
+                {
+                    var rel     = Path.GetRelativePath(repoPath, f);
+                    var lines   = File.ReadLines(f).Take(20).ToList();
+                    var title   = lines.FirstOrDefault(l => l.StartsWith("# "))?.TrimStart('#').Trim()
+                                  ?? Path.GetFileNameWithoutExtension(f);
+                    var snippet = string.Join(" ", lines
+                        .Where(l => !l.StartsWith('#') && !string.IsNullOrWhiteSpace(l))
+                        .Take(3))
+                        .Trim();
+                    snippet = snippet.Length > 300 ? snippet[..300] : snippet;
+                    return new DocCandidate(rel, title, snippet);
+                })
+                .ToList();
+        }
+        catch { return []; }
+    }
+
+    private static string BuildFullReport(string impactSummary, IReadOnlyList<AffectedDoc> affectedDocs, string staleReport)
+    {
         var sb = new StringBuilder();
-        sb.AppendLine("## 🤖 What changed");
-        sb.AppendLine();
-        sb.AppendLine(impactSummary.Trim());
-        sb.AppendLine();
-        sb.AppendLine("---");
-        sb.AppendLine();
+
+        if (!string.IsNullOrWhiteSpace(impactSummary))
+        {
+            sb.AppendLine("## 🤖 What changed");
+            sb.AppendLine();
+            sb.AppendLine(impactSummary.Trim());
+            sb.AppendLine();
+        }
+
+        if (affectedDocs.Count > 0)
+        {
+            sb.AppendLine("## 📚 Related docs to review");
+            sb.AppendLine();
+            foreach (var doc in affectedDocs)
+                sb.AppendLine($"- **`{doc.FilePath}`** — {doc.Reason}");
+            sb.AppendLine();
+        }
+
+        if (sb.Length > 0)
+        {
+            sb.AppendLine("---");
+            sb.AppendLine();
+        }
+
         sb.Append(staleReport);
         return sb.ToString();
     }

@@ -51,6 +51,8 @@ public class GitHubWebhookHandlerTests : IDisposable
             => Task.FromResult(new DocSuggestion(string.Empty, 0f, NeedsReview: false));
         public Task<string> QueryDocsAsync(string question, IEnumerable<DocChunk> docs) => Task.FromResult(string.Empty);
         public Task<string> AnalysePrDiffAsync(string diff) => Task.FromResult(string.Empty);
+        public Task<IReadOnlyList<AffectedDoc>> FindAffectedDocsAsync(string impactSummary, IEnumerable<string> changedFiles, IEnumerable<DocCandidate> candidates)
+            => Task.FromResult<IReadOnlyList<AffectedDoc>>([]);
     }
 
     // ── Signature validation ──────────────────────────────────────────────────

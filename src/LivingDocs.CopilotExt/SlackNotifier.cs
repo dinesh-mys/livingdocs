@@ -14,13 +14,14 @@ public static class SlackNotifier
         int prNumber,
         string repoFullName,
         IReadOnlyList<StaleDoc> staleDocs,
-        string impactSummary = "")
+        string impactSummary = "",
+        IReadOnlyList<AffectedDoc>? affectedDocs = null)
     {
         var webhookUrl = Environment.GetEnvironmentVariable("SLACK_WEBHOOK_URL");
         if (string.IsNullOrWhiteSpace(webhookUrl)) return;
         if (staleDocs.Count == 0) return;
 
-        var payload = BuildPayload(prUrl, prTitle, prNumber, repoFullName, staleDocs, impactSummary);
+        var payload = BuildPayload(prUrl, prTitle, prNumber, repoFullName, staleDocs, impactSummary, affectedDocs ?? []);
         try
         {
             using var http    = new HttpClient();
@@ -36,7 +37,8 @@ public static class SlackNotifier
         int prNumber,
         string repoFullName,
         IReadOnlyList<StaleDoc> staleDocs,
-        string impactSummary)
+        string impactSummary,
+        IReadOnlyList<AffectedDoc> affectedDocs)
     {
         var fileList = new StringBuilder();
         foreach (var doc in staleDocs.Take(8))
@@ -72,6 +74,19 @@ public static class SlackNotifier
             {
                 type = "section",
                 text = new { type = "mrkdwn", text = $"*What changed:* {EscapeSlack(impactSummary.Trim())}" }
+            });
+        }
+
+        if (affectedDocs.Count > 0)
+        {
+            var docLines = new StringBuilder();
+            foreach (var doc in affectedDocs.Take(5))
+                docLines.AppendLine($"• `{doc.FilePath}` — {EscapeSlack(doc.Reason)}");
+
+            blockList.Add(new
+            {
+                type = "section",
+                text = new { type = "mrkdwn", text = $"*📚 Related docs to review:*\n{docLines.ToString().TrimEnd()}" }
             });
         }
 

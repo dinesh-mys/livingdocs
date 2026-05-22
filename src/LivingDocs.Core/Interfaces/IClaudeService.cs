@@ -8,4 +8,8 @@ public interface IClaudeService
     Task<DocSuggestion> SuggestDocUpdateAsync(ChangeEvent change, DocChunk existingDoc, string? symbolContext = null);
     Task<string> QueryDocsAsync(string question, IEnumerable<DocChunk> docs);
     Task<string> AnalysePrDiffAsync(string diff);
+    Task<IReadOnlyList<AffectedDoc>> FindAffectedDocsAsync(
+        string impactSummary,
+        IEnumerable<string> changedFiles,
+        IEnumerable<DocCandidate> candidates);
 }

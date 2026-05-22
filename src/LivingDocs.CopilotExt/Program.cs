@@ -54,4 +54,6 @@ file sealed class NullClaudeService : IClaudeService
         => Task.FromResult(new DocSuggestion(Msg, 0f, NeedsReview: true));
     public Task<string> QueryDocsAsync(string question, IEnumerable<DocChunk> docs) => Task.FromResult(Msg);
     public Task<string> AnalysePrDiffAsync(string diff) => Task.FromResult(Msg);
+    public Task<IReadOnlyList<AffectedDoc>> FindAffectedDocsAsync(string impactSummary, IEnumerable<string> changedFiles, IEnumerable<DocCandidate> candidates)
+        => Task.FromResult<IReadOnlyList<AffectedDoc>>([]);
 }

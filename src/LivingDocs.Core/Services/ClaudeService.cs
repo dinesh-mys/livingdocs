@@ -210,6 +210,75 @@ public class ClaudeService : IClaudeService
         return await CompleteAsync(prompt, maxTokens: 200);
     }
 
+    public async Task<IReadOnlyList<AffectedDoc>> FindAffectedDocsAsync(
+        string impactSummary,
+        IEnumerable<string> changedFiles,
+        IEnumerable<DocCandidate> candidates)
+    {
+        var candidateList = candidates.ToList();
+        if (candidateList.Count == 0) return [];
+
+        var docBlock = new System.Text.StringBuilder();
+        foreach (var c in candidateList)
+            docBlock.AppendLine($"- FilePath: {c.FilePath}\n  Title: {c.Title}\n  Snippet: {c.Snippet}\n");
+
+        var filesLine = string.Join(", ", changedFiles);
+
+        var prompt = $"""
+            You are a documentation analyst. A pull request just merged.
+
+            CHANGE SUMMARY: {impactSummary}
+            CHANGED CODE FILES: {filesLine}
+
+            Below are documentation files in this repository. Identify which ones are
+            CLEARLY related to the changed functionality and may need to be reviewed.
+
+            For each relevant doc, write one sentence explaining why it is affected.
+            Be specific — refer to the actual change, not generic advice.
+
+            Return ONLY a JSON array. Each item must have "filePath" and "reason" fields.
+            Return [] if no docs are clearly related.
+
+            DOCUMENTATION FILES:
+            {docBlock}
+            """;
+
+        var raw = await CompleteAsync(prompt, maxTokens: 500);
+        return ParseAffectedDocs(raw, candidateList);
+    }
+
+    private static IReadOnlyList<AffectedDoc> ParseAffectedDocs(
+        string raw, IReadOnlyList<DocCandidate> candidates)
+    {
+        try
+        {
+            // Extract the JSON array even if Claude wraps it in prose
+            var start = raw.IndexOf('[');
+            var end   = raw.LastIndexOf(']');
+            if (start < 0 || end <= start) return [];
+
+            var json  = raw[start..(end + 1)];
+            var items = JsonDocument.Parse(json).RootElement;
+            if (items.ValueKind != JsonValueKind.Array) return [];
+
+            var lookup = candidates.ToDictionary(c => c.FilePath, c => c.Title, StringComparer.OrdinalIgnoreCase);
+            var result = new List<AffectedDoc>();
+
+            foreach (var item in items.EnumerateArray())
+            {
+                var filePath = item.TryGetProperty("filePath", out var fp) ? fp.GetString() : null;
+                var reason   = item.TryGetProperty("reason",   out var r)  ? r.GetString()  : null;
+
+                if (filePath is null || reason is null) continue;
+                var title = lookup.TryGetValue(filePath, out var t) ? t : Path.GetFileName(filePath);
+                result.Add(new AffectedDoc(filePath, title, reason));
+            }
+
+            return result;
+        }
+        catch { return []; }
+    }
+
     public async Task<string> QueryDocsAsync(string question, IEnumerable<DocChunk> docs)
     {
         var context = new System.Text.StringBuilder();
