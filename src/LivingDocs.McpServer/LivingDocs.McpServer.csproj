@@ -11,14 +11,14 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>livingdocs-mcp</ToolCommandName>
     <PackageId>LivingDocs.Mcp</PackageId>
-    <Version>1.7.1</Version>
+    <Version>2.0.0</Version>
     <Authors>dinesh-mys</Authors>
-    <Description>AI-powered documentation health monitor. Detects stale doc comments and suggests updates using Claude. Works as an MCP server for Claude Desktop, Claude Code, and GitHub Copilot.</Description>
+    <Description>AI-powered knowledge hub for enterprise teams. Indexes Slack, Teams, Email, GitHub, and Confluence. Detects stale docs, knowledge gaps, and departure risk. Works as an MCP server for Claude Desktop, Claude Code, and GitHub Copilot.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/dinesh-mys/livingdocs</PackageProjectUrl>
     <RepositoryUrl>https://github.com/dinesh-mys/livingdocs</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>mcp;claude;copilot;documentation;ai;stale-docs</PackageTags>
+    <PackageTags>mcp;claude;copilot;documentation;ai;stale-docs;slack;teams;confluence;knowledge-management</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
