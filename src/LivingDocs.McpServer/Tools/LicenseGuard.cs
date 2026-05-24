@@ -9,16 +9,19 @@ internal static class LicenseGuard
 
         return status.Plan == "free"
             ? """
-              ⚡ Pro feature — try free for 7 days, then $10/month.
+              ⚡ Pro feature — $10/month, free for 7 days. No credit card needed to start.
 
-              What you get with Pro:
-              • write_docs  — write Claude-generated docs to .md files with timestamps
-              • scan_org    — scan every repo in your GitHub org at once
-              • sync_confluence — push updated docs to Confluence automatically
+              Connect your team's knowledge wherever it lives:
+              • index_slack      — index Slack channels and threads
+              • index_teams      — index Microsoft Teams conversations
+              • index_email      — index email for institutional knowledge
+              • write_docs       — write AI-generated docs to .md files with timestamps
+              • scan_org         — scan every repo in your GitHub org at once
+              • sync_confluence  — push updated docs to Confluence automatically
 
-              Start free trial: https://buy.polar.sh/polar_cl_LcRKdosjt3TwpUkKBSoDOPOP6ea6ArOfKpyB91MSdiM
+              Start your free trial → https://buy.polar.sh/polar_cl_LcRKdosjt3TwpUkKBSoDOPOP6ea6ArOfKpyB91MSdiM
 
-              Set LIVINGDOCS_LICENSE_KEY=<your-key> and you're done.
+              Once you have your key: set LIVINGDOCS_LICENSE_KEY=<your-key>
               """
             : $"License error: {status.Error}";
     }
