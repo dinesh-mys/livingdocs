@@ -18,6 +18,7 @@ public sealed class LicenseService : ILicenseService
 
     private const string StoreUrl    = "https://buy.polar.sh/polar_cl_LcRKdosjt3TwpUkKBSoDOPOP6ea6ArOfKpyB91MSdiM";
     private const string ValidateUrl = "https://api.polar.sh/v1/license-keys/validate";
+    private const string OrgId       = "84ccc684-1529-459e-905b-317c1abbcf76";
 
     // RSA public key for offline enterprise JWT validation (private key held by Novaders LLP)
     private const string PublicKeyPem = """
@@ -58,10 +59,8 @@ public sealed class LicenseService : ILicenseService
             return _cache;
         }
 
-        // Pro key — validate with Polar or format-only
-        _cache = string.IsNullOrWhiteSpace(_orgId)
-            ? FormatCheck()
-            : await ValidateWithPolarAsync();
+        // Pro key — always validate with Polar to enforce trial expiry
+        _cache = await ValidateWithPolarAsync();
 
         return _cache;
     }
@@ -136,9 +135,10 @@ public sealed class LicenseService : ILicenseService
     {
         try
         {
+            var orgId = string.IsNullOrWhiteSpace(_orgId) ? OrgId : _orgId;
             object payload = string.IsNullOrWhiteSpace(_benefitId)
-                ? new { key = _key, organization_id = _orgId }
-                : new { key = _key, organization_id = _orgId, benefit_id = _benefitId };
+                ? new { key = _key, organization_id = orgId }
+                : new { key = _key, organization_id = orgId, benefit_id = _benefitId };
 
             var request = new HttpRequestMessage(HttpMethod.Post, ValidateUrl);
             request.Content = JsonContent.Create(payload);
