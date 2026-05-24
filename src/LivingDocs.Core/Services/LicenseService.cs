@@ -7,6 +7,11 @@ using LivingDocs.Core.Interfaces;
 
 namespace LivingDocs.Core.Services;
 
+/// <summary>
+/// Validates LivingDocs license keys against the Polar licensing API (Pro)
+/// or via offline RSA-signed JWT verification (Enterprise).
+/// Results are cached in-process for the lifetime of the service instance.
+/// </summary>
 public sealed class LicenseService : ILicenseService
 {
     private readonly HttpClient _http;
@@ -33,6 +38,12 @@ public sealed class LicenseService : ILicenseService
         -----END PUBLIC KEY-----
         """;
 
+    /// <summary>
+    /// Initializes the service, reading license configuration from environment variables:
+    /// <c>LIVINGDOCS_LICENSE_KEY</c>, <c>POLAR_ORGANIZATION_ID</c>,
+    /// <c>POLAR_BENEFIT_ID</c>, and <c>POLAR_ACCESS_TOKEN</c>.
+    /// </summary>
+    /// <param name="http">HTTP client used for Polar API validation calls.</param>
     public LicenseService(HttpClient http)
     {
         _http        = http;
@@ -42,6 +53,14 @@ public sealed class LicenseService : ILicenseService
         _accessToken = Environment.GetEnvironmentVariable("POLAR_ACCESS_TOKEN");
     }
 
+    /// <summary>
+    /// Returns the current license status, using a cached result on subsequent calls.
+    /// Detects JWT-format keys for offline Enterprise validation; falls back to Polar API for Pro keys.
+    /// </summary>
+    /// <returns>
+    /// A <see cref="LicenseStatus"/> indicating whether the license is valid,
+    /// the tier (<c>free</c>, <c>pro</c>, or <c>enterprise</c>), and any error message.
+    /// </returns>
     public async Task<LicenseStatus> GetStatusAsync()
     {
         if (_cache is not null) return _cache;
@@ -65,12 +84,21 @@ public sealed class LicenseService : ILicenseService
         return _cache;
     }
 
+    /// <summary>
+    /// Returns <c>true</c> if <paramref name="key"/> looks like a JWT
+    /// (three Base64Url segments separated by dots, starting with <c>eyJ</c>).
+    /// </summary>
     private static bool IsJwt(string key)
     {
         var parts = key.Split('.');
         return parts.Length == 3 && key.StartsWith("eyJ", StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Validates an Enterprise JWT license offline using RSA-SHA256 signature verification.
+    /// Checks the algorithm header, signature integrity, issuer (<c>livingdocs</c>), and expiry claim.
+    /// </summary>
+    /// <returns>A valid <see cref="LicenseStatus"/> with the tier from the JWT payload, or an error status.</returns>
     private LicenseStatus ValidateJwtLicense()
     {
         try
@@ -123,6 +151,10 @@ public sealed class LicenseService : ILicenseService
         }
     }
 
+    /// <summary>
+    /// Performs a basic structural check on a Pro license key — must start with <c>LD-</c>
+    /// and be at least 15 characters. Does not contact the Polar API.
+    /// </summary>
     private LicenseStatus FormatCheck()
     {
         var valid = _key!.StartsWith("LD-", StringComparison.OrdinalIgnoreCase) && _key.Length >= 15;
@@ -131,6 +163,11 @@ public sealed class LicenseService : ILicenseService
             : new LicenseStatus(false, "invalid", $"Invalid license key. Get yours at {StoreUrl}");
     }
 
+    /// <summary>
+    /// Validates a Pro license key against the Polar API (<c>/v1/license-keys/validate</c>).
+    /// Always called for Pro keys to enforce trial expiry. Returns an error status on network failure
+    /// rather than failing open.
+    /// </summary>
     private async Task<LicenseStatus> ValidateWithPolarAsync()
     {
         try
@@ -177,15 +214,19 @@ public sealed class LicenseService : ILicenseService
         }
     }
 
+    /// <summary>Decodes a Base64Url-encoded string to a byte array.</summary>
     private static byte[] Base64UrlDecode(string input) =>
         Convert.FromBase64String(Pad(input.Replace('-', '+').Replace('_', '/')));
 
+    /// <summary>Alias for <see cref="Base64UrlDecode"/> used when the intent is raw bytes (e.g. signature).</summary>
     private static byte[] Base64UrlDecodeBytes(string input) =>
         Base64UrlDecode(input);
 
+    /// <summary>Adds standard Base64 padding characters to a Base64Url-encoded string.</summary>
     private static string Pad(string s) =>
         s.PadRight(s.Length + (4 - s.Length % 4) % 4, '=');
 
+    /// <summary>Minimal projection of the Polar <c>/v1/license-keys/validate</c> response body.</summary>
     private sealed record PolarValidateResponse(
         [property: JsonPropertyName("status")]     string?   Status,
         [property: JsonPropertyName("expires_at")] DateTime? ExpiresAt);
