@@ -40,9 +40,10 @@ public static class LivingDocsTools
             sb.AppendLine($"  Code last changed: {doc.CodeLastChanged:yyyy-MM-dd}");
         }
 
-        // Value-first trial offer: only for non-Pro users, only when there is value to act on.
+        // Value-first trial offer: only for free users (not expired/invalid paid keys),
+        // and only when there is value to act on (stale docs were found above).
         var status = await license.GetStatusAsync();
-        if (!status.IsValid)
+        if (!status.IsValid && status.Plan == "free")
         {
             telemetry.Track("upsell_shown", new Dictionary<string, string> { ["source"] = "scan" });
             sb.AppendLine();
@@ -379,8 +380,8 @@ public static class LivingDocsTools
         return sb.ToString().TrimEnd();
     }
 
-    // Coarse bucket so we never collect exact counts.
-    private static string Bucket(int n) =>
+    // Coarse bucket so we never collect exact counts. Internal so the CLI index path reuses it.
+    internal static string Bucket(int n) =>
         n switch
         {
             < 10  => "1-9",

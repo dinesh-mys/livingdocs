@@ -140,7 +140,7 @@ static async Task RunIndexAsync(string repoPath)
     {
         var telemetry = new TelemetryService(new HttpClient(), noticeWriter: Console.Out);
         await telemetry.TrackAsync("index_success",
-            new Dictionary<string, string> { ["chunks"] = total < 10 ? "1-9" : total < 50 ? "10-49" : total < 200 ? "50-199" : "200+" });
+            new Dictionary<string, string> { ["chunks"] = LivingDocsTools.Bucket(total) });
     }
 }
 
