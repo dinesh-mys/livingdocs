@@ -23,14 +23,12 @@ public sealed class TelemetryService : ITelemetryService
     /// <summary>True when telemetry is enabled (no opt-out env var set).</summary>
     public bool IsEnabled { get; }
 
-    /// <param name="http">HTTP client used for the POST. A 2s timeout is applied.</param>
+    /// <param name="http">HTTP client used for the POST. Each send is bounded by a 2s timeout.</param>
     /// <param name="installIdPath">Override for the install-id file path (tests). Defaults to ~/.livingdocs/install-id.</param>
     /// <param name="noticeWriter">Optional writer for the first-run notice (CLI only; never pass in MCP stdio mode).</param>
     public TelemetryService(HttpClient http, string? installIdPath = null, TextWriter? noticeWriter = null)
     {
         _http = http;
-        try { _http.Timeout = TimeSpan.FromSeconds(2); } catch { /* already started */ }
-
         IsEnabled = !IsOptedOut();
         _version = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown";
         _os = GetOs();
@@ -56,6 +54,7 @@ public sealed class TelemetryService : ITelemetryService
         if (!IsEnabled) return;
         try
         {
+            // System.Text.Json serializes the `@event` member as the JSON field "event".
             var payload = new
             {
                 @event,
@@ -95,11 +94,10 @@ public sealed class TelemetryService : ITelemetryService
             }
             else
             {
-                var dir = Path.Combine(
+                file = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    ".livingdocs");
-                Directory.CreateDirectory(dir);
-                file = Path.Combine(dir, "install-id");
+                    ".livingdocs",
+                    "install-id");
             }
 
             if (File.Exists(file))
