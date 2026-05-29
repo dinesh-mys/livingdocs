@@ -2,13 +2,15 @@ using LivingDocs.Core.Interfaces;
 
 internal static class LicenseGuard
 {
-    internal static async Task<string?> RequireProAsync(ILicenseService license)
+    internal static async Task<string?> RequireProAsync(ILicenseService license, ITelemetryService telemetry)
     {
         var status = await license.GetStatusAsync();
         if (status.IsValid) return null;
 
-        return status.Plan == "free"
-            ? """
+        if (status.Plan == "free")
+        {
+            telemetry.Track("upsell_shown", new Dictionary<string, string> { ["source"] = "pro_tool" });
+            return """
               ⚡ Pro feature — $10/month, free for 7 days. No credit card needed to start.
 
               Connect your team's knowledge wherever it lives:
@@ -22,7 +24,9 @@ internal static class LicenseGuard
               Start your free trial → https://buy.polar.sh/polar_cl_LcRKdosjt3TwpUkKBSoDOPOP6ea6ArOfKpyB91MSdiM
 
               Once you have your key: set LIVINGDOCS_LICENSE_KEY=<your-key>
-              """
-            : $"License error: {status.Error}";
+              """;
+        }
+
+        return $"License error: {status.Error}";
     }
 }
