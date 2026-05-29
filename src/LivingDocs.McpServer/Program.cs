@@ -136,6 +136,12 @@ static async Task RunIndexAsync(string repoPath)
     var indexer  = new IndexService(new DocExtractorService(), factory);
     var total    = await indexer.IndexRepoAsync(repoPath);
     Console.WriteLine($"Indexed {total} chunk(s). Semantic search ready.");
+    if (total > 0)
+    {
+        var telemetry = new TelemetryService(new HttpClient(), noticeWriter: Console.Out);
+        await telemetry.TrackAsync("index_success",
+            new Dictionary<string, string> { ["chunks"] = total < 10 ? "1-9" : total < 50 ? "10-49" : total < 200 ? "50-199" : "200+" });
+    }
 }
 
 static async Task RunReindexAsync(string repoPath, string filePath)
