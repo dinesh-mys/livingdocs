@@ -65,6 +65,7 @@ builder.Services
         catch  { return new NullClaudeService(); }
     })
     .AddSingleton<ILicenseService>(_ => new LicenseService(new HttpClient()))
+    .AddSingleton<ITelemetryService>(_ => new TelemetryService(new HttpClient()))
     .AddSingleton<IConfluenceService>(_ => new ConfluenceService(new HttpClient()))
     .AddSingleton<IGitHubOrgService>(_ => new GitHubOrgService(new HttpClient()))
     .AddSingleton<ISemanticSearchServiceFactory, ClaudeAssistedSearchFactory>()
@@ -81,7 +82,9 @@ builder.Services
     .WithStdioServerTransport()
     .WithToolsFromAssembly(typeof(LivingDocsTools).Assembly);
 
-await builder.Build().RunAsync();
+var app = builder.Build();
+app.Services.GetRequiredService<ITelemetryService>().Track("mcp_started");
+await app.RunAsync();
 
 // ── CLI helpers ───────────────────────────────────────────────────────────
 
