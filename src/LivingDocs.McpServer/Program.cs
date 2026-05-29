@@ -130,6 +130,10 @@ static async Task RunIndexAsync(string repoPath)
         Environment.Exit(1);
     }
 
+    // Construct unconditionally so first_run fires on a user's first invocation
+    // even if this repo has no doc comments (total == 0).
+    var telemetry = new TelemetryService(new HttpClient(), noticeWriter: Console.Out);
+
     Console.WriteLine($"Indexing {repoPath} ...");
     var claude   = TryCreateClaude();
     var factory  = new ClaudeAssistedSearchFactory(claude);
@@ -138,7 +142,6 @@ static async Task RunIndexAsync(string repoPath)
     Console.WriteLine($"Indexed {total} chunk(s). Semantic search ready.");
     if (total > 0)
     {
-        var telemetry = new TelemetryService(new HttpClient(), noticeWriter: Console.Out);
         await telemetry.TrackAsync("index_success",
             new Dictionary<string, string> { ["chunks"] = LivingDocsTools.Bucket(total) });
     }

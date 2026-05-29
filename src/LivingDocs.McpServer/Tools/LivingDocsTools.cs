@@ -47,8 +47,9 @@ public static class LivingDocsTools
         {
             telemetry.Track("upsell_shown", new Dictionary<string, string> { ["source"] = "scan" });
             sb.AppendLine();
-            sb.AppendLine($"💡 Found {result.StaleDocs.Count} stale doc(s). `write_back` can fix them");
-            sb.AppendLine("   automatically, in place — free for 7 days, no card needed →");
+            sb.AppendLine($"💡 Found {result.StaleDocs.Count} stale doc(s). Fix them now for free with `write_back`.");
+            sb.AppendLine("   Want this across your whole org — scan_org, Confluence sync, Slack/Teams?");
+            sb.AppendLine("   Try Pro free for 7 days, no card needed →");
             sb.AppendLine("   https://buy.polar.sh/polar_cl_LcRKdosjt3TwpUkKBSoDOPOP6ea6ArOfKpyB91MSdiM");
         }
 

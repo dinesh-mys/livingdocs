@@ -86,18 +86,18 @@ public class TelemetryServiceTests : IDisposable
     {
         SetEnv("DO_NOT_TRACK", null);
         SetEnv("LIVINGDOCS_TELEMETRY", null);
+        File.WriteAllText(_tmpIdPath, "existing-id"); // pre-seed so no first_run fires
         var handler = new CapturingHandler();
         var svc = new TelemetryService(new HttpClient(handler), _tmpIdPath);
-        handler.Clear(); // drop the ctor's first_run
 
-        await svc.TrackAsync("index_success", new Dictionary<string, string> { ["chunks"] = "10-50" });
+        await svc.TrackAsync("index_success", new Dictionary<string, string> { ["chunks"] = "10-49" });
 
         Assert.Single(handler.Snapshot());
         using var doc = JsonDocument.Parse(handler.Snapshot()[0]);
         var root = doc.RootElement;
         Assert.Equal("index_success", root.GetProperty("event").GetString());
         Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("installId").GetString()));
-        Assert.Equal("10-50", root.GetProperty("props").GetProperty("chunks").GetString());
+        Assert.Equal("10-49", root.GetProperty("props").GetProperty("chunks").GetString());
     }
 
     [Fact]
@@ -141,9 +141,9 @@ public class TelemetryServiceTests : IDisposable
     {
         SetEnv("DO_NOT_TRACK", null);
         SetEnv("LIVINGDOCS_TELEMETRY", null);
+        File.WriteAllText(_tmpIdPath, "existing-id"); // pre-seed so no first_run fires
         var handler = new CapturingHandler();
         var svc = new TelemetryService(new HttpClient(handler), _tmpIdPath);
-        handler.Clear(); // drop ctor first_run
 
         svc.Track("mcp_started");
 
