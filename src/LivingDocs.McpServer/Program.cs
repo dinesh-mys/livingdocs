@@ -65,6 +65,7 @@ builder.Services
         catch  { return new NullClaudeService(); }
     })
     .AddSingleton<ILicenseService>(_ => new LicenseService(new HttpClient()))
+    .AddSingleton<ITelemetryService>(_ => new TelemetryService(new HttpClient()))
     .AddSingleton<IConfluenceService>(_ => new ConfluenceService(new HttpClient()))
     .AddSingleton<IGitHubOrgService>(_ => new GitHubOrgService(new HttpClient()))
     .AddSingleton<ISemanticSearchServiceFactory, ClaudeAssistedSearchFactory>()
@@ -81,7 +82,9 @@ builder.Services
     .WithStdioServerTransport()
     .WithToolsFromAssembly(typeof(LivingDocsTools).Assembly);
 
-await builder.Build().RunAsync();
+var app = builder.Build();
+app.Services.GetRequiredService<ITelemetryService>().Track("mcp_started");
+await app.RunAsync();
 
 // ── CLI helpers ───────────────────────────────────────────────────────────
 
@@ -127,12 +130,21 @@ static async Task RunIndexAsync(string repoPath)
         Environment.Exit(1);
     }
 
+    // Construct unconditionally so first_run fires on a user's first invocation
+    // even if this repo has no doc comments (total == 0).
+    var telemetry = new TelemetryService(new HttpClient(), noticeWriter: Console.Out);
+
     Console.WriteLine($"Indexing {repoPath} ...");
     var claude   = TryCreateClaude();
     var factory  = new ClaudeAssistedSearchFactory(claude);
     var indexer  = new IndexService(new DocExtractorService(), factory);
     var total    = await indexer.IndexRepoAsync(repoPath);
     Console.WriteLine($"Indexed {total} chunk(s). Semantic search ready.");
+    if (total > 0)
+    {
+        await telemetry.TrackAsync("index_success",
+            new Dictionary<string, string> { ["chunks"] = LivingDocsTools.Bucket(total) });
+    }
 }
 
 static async Task RunReindexAsync(string repoPath, string filePath)

@@ -18,13 +18,14 @@ public static class ConnectorTools
         "Bot needs channels:history and channels:read OAuth scopes.")]
     public static async Task<string> IndexSlack(
         ILicenseService license,
+        ITelemetryService telemetry,
         ISlackConnectorService slack,
         ISemanticSearchServiceFactory searchFactory,
         [Description("Absolute path to the local git repository — determines which index to write to")] string repoPath,
         [Description("Slack channel ID (e.g. C1234ABCD) or name prefixed with #")] string channelId,
         [Description("Maximum number of messages to fetch (default 200)")] int limit = 200)
     {
-        var licenseError = await LicenseGuard.RequireProAsync(license);
+        var licenseError = await LicenseGuard.RequireProAsync(license, telemetry);
         if (licenseError is not null) return licenseError;
 
         if (!Directory.Exists(repoPath))
@@ -71,6 +72,7 @@ public static class ConnectorTools
         "The Azure AD app needs ChannelMessage.Read.All application permission with admin consent.")]
     public static async Task<string> IndexTeams(
         ILicenseService license,
+        ITelemetryService telemetry,
         ITeamsConnectorService teams,
         ISemanticSearchServiceFactory searchFactory,
         [Description("Absolute path to the local git repository")] string repoPath,
@@ -78,7 +80,7 @@ public static class ConnectorTools
         [Description("Teams channel ID (from Teams admin or Graph Explorer)")] string channelId,
         [Description("Maximum number of messages to fetch per request (max 50, default 50)")] int limit = 50)
     {
-        var licenseError = await LicenseGuard.RequireProAsync(license);
+        var licenseError = await LicenseGuard.RequireProAsync(license, telemetry);
         if (licenseError is not null) return licenseError;
 
         if (!Directory.Exists(repoPath))
@@ -126,13 +128,14 @@ public static class ConnectorTools
         "Optional: IMAP_PORT (default 993). Works with Gmail app passwords, Outlook, and any IMAP provider.")]
     public static async Task<string> IndexEmail(
         ILicenseService license,
+        ITelemetryService telemetry,
         IEmailConnectorService email,
         ISemanticSearchServiceFactory searchFactory,
         [Description("Absolute path to the local git repository")] string repoPath,
         [Description("IMAP folder name — use a dedicated folder like 'Engineering' for best results (default INBOX)")] string folder = "INBOX",
         [Description("Maximum number of emails to fetch (default 100)")] int limit = 100)
     {
-        var licenseError = await LicenseGuard.RequireProAsync(license);
+        var licenseError = await LicenseGuard.RequireProAsync(license, telemetry);
         if (licenseError is not null) return licenseError;
 
         if (!Directory.Exists(repoPath))

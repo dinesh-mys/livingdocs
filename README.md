@@ -496,6 +496,24 @@ Enterprise licenses run fully offline — no internet required for license valid
 | `IMAP_USERNAME` | `index_email` | Email address / IMAP login |
 | `IMAP_PASSWORD` | `index_email` | Password or app password |
 | `IMAP_PORT` | `index_email` | IMAP port — defaults to `993` (SSL) |
+| `DO_NOT_TRACK` | Optional | Set to `1` to disable anonymous telemetry (see below) |
+| `LIVINGDOCS_TELEMETRY` | Optional | Set to `off` to disable anonymous telemetry (see below) |
+
+## Telemetry
+
+LivingDocs sends a small amount of **anonymous** usage data so we can see which
+setup steps people complete (install, server start, first successful index, and
+when an upgrade prompt is shown). Each event contains only a random installation
+ID, the app version, and your OS — **never** your code, file paths, repository
+names, or any personal data.
+
+To opt out, set either environment variable:
+
+```
+DO_NOT_TRACK=1
+# or
+LIVINGDOCS_TELEMETRY=off
+```
 
 ## Supported languages
 

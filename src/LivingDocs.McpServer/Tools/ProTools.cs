@@ -14,6 +14,7 @@ public static class ProTools
         "and CONFLUENCE_SPACE_KEY to be set.")]
     public static async Task<string> SyncConfluence(
         ILicenseService          license,
+        ITelemetryService        telemetry,
         IStaleDocDetectorService detector,
         IDocExtractorService     extractor,
         IGitScannerService       scanner,
@@ -23,7 +24,7 @@ public static class ProTools
         [Description("File path relative to the repository root, e.g. src/Tax.cs")] string filePath,
         [Description("Confluence space key, e.g. DEV (overrides CONFLUENCE_SPACE_KEY env var)")] string? spaceKey = null)
     {
-        var licenseError = await LicenseGuard.RequireProAsync(license);
+        var licenseError = await LicenseGuard.RequireProAsync(license, telemetry);
         if (licenseError is not null) return licenseError;
 
         var space = spaceKey
@@ -123,6 +124,7 @@ public static class ProTools
         "Requires LIVINGDOCS_LICENSE_KEY and ANTHROPIC_API_KEY to be set.")]
     public static async Task<string> WriteDocs(
         ILicenseService          license,
+        ITelemetryService        telemetry,
         IStaleDocDetectorService detector,
         IDocExtractorService     extractor,
         IGitScannerService       scanner,
@@ -131,7 +133,7 @@ public static class ProTools
         [Description("Absolute path to the git repository")] string repoPath,
         [Description("File path relative to the repository root, e.g. src/Tax.cs")] string filePath)
     {
-        var licenseError = await LicenseGuard.RequireProAsync(license);
+        var licenseError = await LicenseGuard.RequireProAsync(license, telemetry);
         if (licenseError is not null) return licenseError;
 
         var fullPath = Path.Combine(repoPath, filePath);
@@ -206,12 +208,13 @@ public static class ProTools
         "Requires LIVINGDOCS_LICENSE_KEY and GITHUB_TOKEN (for private repos + higher rate limits).")]
     public static async Task<string> ScanOrg(
         ILicenseService          license,
+        ITelemetryService        telemetry,
         IStaleDocDetectorService detector,
         IGitHubOrgService        github,
         [Description("GitHub organisation or user name, e.g. my-company")] string orgName,
         [Description("Maximum number of repos to scan (default 20)")] int maxRepos = 20)
     {
-        var licenseError = await LicenseGuard.RequireProAsync(license);
+        var licenseError = await LicenseGuard.RequireProAsync(license, telemetry);
         if (licenseError is not null) return licenseError;
 
         // ── 1. List repos ──────────────────────────────────────────────────────
