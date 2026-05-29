@@ -16,6 +16,8 @@ public static class LivingDocsTools
         "touched in 90+ days since the code changed.")]
     public static async Task<string> ScanRepo(
         IStaleDocDetectorService detector,
+        ILicenseService license,
+        ITelemetryService telemetry,
         [Description("Absolute path to the local git repository to scan")] string repoPath)
     {
         if (!Directory.Exists(repoPath))
@@ -36,6 +38,17 @@ public static class LivingDocsTools
             sb.AppendLine($"• {doc.FilePath}  (staleness: {doc.StaleScore:P0})");
             sb.AppendLine($"  Doc last updated : {doc.DocLastUpdated:yyyy-MM-dd}");
             sb.AppendLine($"  Code last changed: {doc.CodeLastChanged:yyyy-MM-dd}");
+        }
+
+        // Value-first trial offer: only for non-Pro users, only when there is value to act on.
+        var status = await license.GetStatusAsync();
+        if (!status.IsValid)
+        {
+            telemetry.Track("upsell_shown", new Dictionary<string, string> { ["source"] = "scan" });
+            sb.AppendLine();
+            sb.AppendLine($"💡 Found {result.StaleDocs.Count} stale doc(s). `write_back` can fix them");
+            sb.AppendLine("   automatically, in place — free for 7 days, no card needed →");
+            sb.AppendLine("   https://buy.polar.sh/polar_cl_LcRKdosjt3TwpUkKBSoDOPOP6ea6ArOfKpyB91MSdiM");
         }
 
         return sb.ToString().TrimEnd();
@@ -84,6 +97,7 @@ public static class LivingDocsTools
         "The index is stored in a .livingdocs/ folder inside the repository. " +
         "Requires ANTHROPIC_API_KEY to be set.")]
     public static async Task<string> IndexRepo(
+        ITelemetryService telemetry,
         IIndexService indexer,
         ISemanticSearchServiceFactory searchFactory,
         [Description("Absolute path to the local git repository")] string repoPath)
@@ -97,6 +111,7 @@ public static class LivingDocsTools
             return $"No documentation comments found in '{repoPath}'. " +
                    $"Add doc comments (///, JSDoc, or docstrings) and re-run index_repo.";
 
+        telemetry.Track("index_success", new Dictionary<string, string> { ["chunks"] = Bucket(total) });
         await using var search = searchFactory.Create(repoPath);
         var stats = search.GetStats();
         var since = stats.LastIndexed.HasValue
@@ -363,4 +378,14 @@ public static class LivingDocsTools
 
         return sb.ToString().TrimEnd();
     }
+
+    // Coarse bucket so we never collect exact counts.
+    private static string Bucket(int n) =>
+        n switch
+        {
+            < 10  => "1-9",
+            < 50  => "10-49",
+            < 200 => "50-199",
+            _     => "200+",
+        };
 }
