@@ -13,7 +13,7 @@ namespace LivingDocs.Core.Services;
 /// </summary>
 public sealed class TelemetryService : ITelemetryService
 {
-    private const string EndpointUrl = "https://livingdocs-web.vercel.app/api/event";
+    private const string EndpointUrl = "https://livingdocs-web-lake.vercel.app/api/event";
 
     private readonly HttpClient _http;
     private readonly string _installId;
